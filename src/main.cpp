@@ -1,12 +1,13 @@
 #define GLM_FORCE_CUDA
 #include <vector>
 
+#include "imgui_internal.h"
 #include "imgui.h"
 #include "vendor/imgui/backend/imgui_impl_glfw.h"
 #include "vendor/imgui/backend/imgui_impl_opengl3.h"
 #include <stdio.h>
 #include "gl_debug.h"
-#include "color.hpp"
+#include "image.hpp"
 
 #define GL_SILENCE_DEPRECATION
 #if defined(IMGUI_IMPL_OPENGL_ES2)
@@ -29,12 +30,35 @@
 const int SCREEN_WIDTH = 1280;
 const int SCREEN_HEIGHT = 720;
 
-const int CANVAS_WIDTH = 640;
-const int CANVAS_HEIGHT = 360;
+static int curr_win_pos_x = 0;
+static int curr_win_pos_y = 0;
+
+static int curr_scr_width = SCREEN_WIDTH;
+static int curr_scr_height = SCREEN_HEIGHT;
 
 static void glfw_error_callback(int error, const char* description)
 {
     fprintf(stderr, "GLFW Error %d: %s\n", error, description);
+}
+
+static void on_pos(GLFWwindow* window, int x, int y) {
+    curr_win_pos_x = x;
+    curr_win_pos_y = y;
+}
+
+static void on_resize(GLFWwindow* window, int width, int height) {
+    curr_scr_height = height;
+    curr_scr_width = width;
+}
+// Function to retrieve supported resolutions
+std::vector<std::pair<int, int>> get_supported_resolutions() {
+    std::vector<std::pair<int, int>> resolutions;
+    // Add supported resolutions (You can use GLFW functions to get available modes)
+    resolutions.emplace_back(1920, 1080);
+    resolutions.emplace_back(1280, 720);
+    resolutions.emplace_back(1024, 768);
+
+    return resolutions;
 }
 
 // Main code
@@ -72,7 +96,9 @@ int main(int, char**)
     if (window == nullptr)
         return 1;
     glfwMakeContextCurrent(window);
-    glfwSwapInterval(1); // Enable vsync
+    glfwSwapInterval(0); // Enable vsync
+    glfwSetWindowSizeCallback(window, on_resize);
+    glfwSetWindowPosCallback(window, on_pos);
 
     // Setup Dear ImGui context
     IMGUI_CHECKVERSION();
@@ -80,6 +106,7 @@ int main(int, char**)
     ImGuiIO& io = ImGui::GetIO(); (void)io;
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
+    ImGuiWindowFlags windowFlags = ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize;
 
     // Setup Dear ImGui style
     ImGui::StyleColorsDark();
@@ -94,26 +121,39 @@ int main(int, char**)
 
     // INIT
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
-    std::vector<uint32_t> image(CANVAS_WIDTH * CANVAS_HEIGHT);
-    for (int y = 0; y < CANVAS_HEIGHT; ++y) {
-        for (int x = 0; x < CANVAS_WIDTH; ++x) {
-            image[x + (y * CANVAS_WIDTH)] = color::get_color_rgb(255, 0, 0);
-        }
-    }
+    img::Image canvas(640, 360);
+    canvas.clear(0x0000FFFF);
 
     GLuint canvas_texture;
     GLCall(glGenTextures(1, &canvas_texture));
     GLCall(glBindTexture(GL_TEXTURE_2D, canvas_texture));
     GLCall(glPixelStorei(GL_UNPACK_ALIGNMENT, 1));
     GLCall(glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA,
-                        CANVAS_WIDTH, CANVAS_HEIGHT, 0,
+                        canvas.get_width(), canvas.get_height(), 0,
                         GL_RGBA, GL_UNSIGNED_INT_8_8_8_8,
-                        &image[0]));
+                        canvas.raw()));
 
     GLCall(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR));
     GLCall(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR));
     GLCall(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT));
     GLCall(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT));
+    bool is_fullscreen = false;
+    ImVec2 old_size = ImVec2(SCREEN_WIDTH, SCREEN_HEIGHT);
+    ImVec2 old_pos = ImVec2(0, 0);
+
+    // Get supported resolutions
+    std::vector<std::pair<int, int>> supp_res = get_supported_resolutions();
+    char res_items[1024];
+    {
+        size_t curr_offset = 0;
+        for (int i = 0; i < supp_res.size(); i++) {
+            std::string curr_res = std::to_string(supp_res[i].first) + "x" + std::to_string(supp_res[i].second);
+            strcpy(res_items + curr_offset, curr_res.c_str());
+            curr_offset += curr_res.size() + 1;
+        }
+        res_items[curr_offset] = '\0';
+    }
+    int selected_res = 0;
 
     // Main loop
 #ifdef __EMSCRIPTEN__
@@ -125,23 +165,69 @@ int main(int, char**)
     while (!glfwWindowShouldClose(window))
 #endif
     {
-        // Poll and handle events (inputs, window resize, etc.)
-        // You can read the io.WantCaptureMouse, io.WantCaptureKeyboard flags to tell if dear imgui wants to use your inputs.
-        // - When io.WantCaptureMouse is true, do not dispatch mouse input data to your main application, or clear/overwrite your copy of the mouse data.
-        // - When io.WantCaptureKeyboard is true, do not dispatch keyboard input data to your main application, or clear/overwrite your copy of the keyboard data.
-        // Generally you may always pass all inputs to dear imgui, and hide them from your application based on those two flags.
         glfwPollEvents();
 
         // Start the Dear ImGui frame
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
-        {
-            ImGui::Begin("Hello, world!");
-            ImGui::Image((void*)(intptr_t) canvas_texture, ImVec2(CANVAS_WIDTH, CANVAS_HEIGHT));
+
+        auto height = static_cast<float>(curr_scr_height);
+        auto width_win1 = static_cast<float>(curr_scr_width) / 4.f * 3.f;
+        auto width_win2 = static_cast<float>(curr_scr_width) / 4.f;
+        ImVec2 win1_size = ImVec2(width_win1, height);
+        ImVec2 win2_size = ImVec2(width_win2, height);
+
+        if (is_fullscreen) {
+            ImGui::SetNextWindowPos(ImVec2(0, 0));
+            ImGui::SetNextWindowSize(ImVec2(curr_scr_width, curr_scr_height));
+            win1_size = ImVec2(curr_scr_width, curr_scr_height);
+        } else {
+            ImGui::SetNextWindowPos(ImVec2(0, 0));
+            ImGui::SetNextWindowSize(win1_size);
+        }
+
+        ImGui::Begin("Window 1", nullptr, windowFlags);
+
+        if (ImGui::Button("Toggle Fullscreen")) {
+            is_fullscreen = !is_fullscreen;
+
+            if (is_fullscreen) {
+                old_size = ImVec2(curr_scr_width, curr_scr_height);
+                old_pos = ImVec2(curr_win_pos_x, curr_win_pos_y);
+                GLFWmonitor* monitor = glfwGetPrimaryMonitor();
+                const GLFWvidmode* mode = glfwGetVideoMode(monitor);
+                glfwSetWindowMonitor(window, monitor, 0, 0, mode->width, mode->height, GLFW_DONT_CARE);
+            } else {
+                glfwSetWindowMonitor(window, nullptr, old_pos.x, old_pos.y, old_size.x, old_size.y, GLFW_DONT_CARE);
+            }
+        }
+
+        // Display supported resolutions in a combo box
+        ImGui::SameLine();
+        if (ImGui::Combo("##Resolution", &selected_res, res_items, std::max(6, (int)supp_res.size()))) {
+
+        }
+
+        // Calculate the position to center the image
+        ImVec2 img_size(canvas.get_width(), canvas.get_height());
+        ImVec2 img_pos = ImGui::GetCursorScreenPos();
+        img_pos.x += (win1_size.x - img_size.x) * 0.5f;
+        img_pos.y += (win1_size.y - img_size.y) * 0.5f;
+
+        // Display the image at the calculated position
+        ImGui::SetCursorScreenPos(img_pos);
+        ImGui::Image((void*)(intptr_t)canvas_texture, img_size);
+        ImGui::End();
+
+        if (!is_fullscreen) {
+            ImGui::SetNextWindowPos(ImVec2(width_win1, 0));
+            ImGui::SetNextWindowSize(win2_size);
+            ImGui::Begin("Window 2", nullptr, windowFlags);
 
             ImGui::End();
         }
+
 
         // Rendering
         ImGui::Render();
