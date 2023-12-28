@@ -96,15 +96,6 @@ void Window::on_glfw_error(int error, const char *description) {
     fprintf(stderr, "[GLFW] Error %d: %s\n", error, description);
 }
 
-std::vector<std::pair<int, int>> Window::get_supported_resolutions() {
-    std::vector<std::pair<int, int>> resolutions;
-    resolutions.emplace_back(1920, 1080);
-    resolutions.emplace_back(1280, 720);
-    resolutions.emplace_back(1024, 768);
-
-    return resolutions;
-}
-
 void Window::toggle_fullscreen() {
     s_is_fullscreen = !s_is_fullscreen;
 

@@ -14,8 +14,6 @@ public:
 
     static GLFWwindow* get_win_handle();
 
-    static std::vector<std::pair<int, int>> get_supported_resolutions();
-
     static bool should_close() { return glfwWindowShouldClose(s_win_handle); }
     static bool is_fullscreen() { return s_is_fullscreen; }
     static void toggle_fullscreen();

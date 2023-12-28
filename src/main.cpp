@@ -1,5 +1,6 @@
 #define GLM_FORCE_CUDA
 #include <vector>
+#include <glm/glm.hpp>
 
 #include "imgui_internal.h"
 #include "imgui.h"
@@ -8,6 +9,8 @@
 #include "gl_debug.h"
 #include "image.hpp"
 #include "window.hpp"
+
+#include "cuda_ray_tracer.cuh"
 
 #define GL_SILENCE_DEPRECATION
 #if defined(IMGUI_IMPL_OPENGL_ES2)
@@ -19,6 +22,17 @@
 #pragma comment(lib, "legacy_stdio_definitions")
 #endif
 
+std::vector<std::pair<int, int>> get_supported_resolutions() {
+    std::vector<std::pair<int, int>> resolutions;
+    resolutions.emplace_back(1920, 1080);
+    resolutions.emplace_back(1440, 900);
+    resolutions.emplace_back(1280, 720);
+    resolutions.emplace_back(1024, 768);
+    resolutions.emplace_back(640, 360);
+
+    return resolutions;
+}
+
 
 // Main code
 int main(int, char**)
@@ -27,9 +41,23 @@ int main(int, char**)
 
     ImGuiWindowFlags windowFlags = ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize;
 
+    // Get supported resolutions
+    std::vector<std::pair<int, int>> supp_res = get_supported_resolutions();
+    char res_items[1024];
+    {
+        size_t curr_offset = 0;
+        for (int i = 0; i < supp_res.size(); i++) {
+            std::string curr_res = std::to_string(supp_res[i].first) + "x" + std::to_string(supp_res[i].second);
+            strcpy(res_items + curr_offset, curr_res.c_str());
+            curr_offset += curr_res.size() + 1;
+        }
+        res_items[curr_offset] = '\0';
+    }
+    int selected_res = supp_res.size() - 1;
+
     // INIT
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
-    img::Image canvas(640, 360);
+    img::Image canvas(supp_res[selected_res].first, supp_res[selected_res].second);
     canvas.clear(0x0000FFFF);
 
     GLuint canvas_texture;
@@ -46,24 +74,19 @@ int main(int, char**)
     GLCall(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT));
     GLCall(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT));
 
-    // Get supported resolutions
-    std::vector<std::pair<int, int>> supp_res = Window::get_supported_resolutions();
-    char res_items[1024];
-    {
-        size_t curr_offset = 0;
-        for (int i = 0; i < supp_res.size(); i++) {
-            std::string curr_res = std::to_string(supp_res[i].first) + "x" + std::to_string(supp_res[i].second);
-            strcpy(res_items + curr_offset, curr_res.c_str());
-            curr_offset += curr_res.size() + 1;
-        }
-        res_items[curr_offset] = '\0';
-    }
-    int selected_res = 0;
-
-
     while (!Window::should_close())
     {
         glfwPollEvents();
+
+        for (int y = 0; y < canvas.get_height(); y++) {
+            for (int x = 0; x < canvas.get_width(); x++) {
+                canvas.set_pixel(x, y, per_pixel(x, y));
+            }
+        }
+        GLCall(glTexSubImage2D(GL_TEXTURE_2D, 0, 0,0,
+                               canvas.get_width(), canvas.get_height(),
+                        GL_RGBA, GL_UNSIGNED_INT_8_8_8_8,
+                        canvas.raw()));
 
         // Start the Dear ImGui frame
         ImGui_ImplOpenGL3_NewFrame();
@@ -94,7 +117,12 @@ int main(int, char**)
         // Display supported resolutions in a combo box
         ImGui::SameLine();
         if (ImGui::Combo("##Resolution", &selected_res, res_items, std::max(6, (int)supp_res.size()))) {
-
+            canvas.resize(supp_res[selected_res].first, supp_res[selected_res].second);
+            canvas.clear(0x0000FFFF);
+            GLCall(glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA,
+                        canvas.get_width(), canvas.get_height(), 0,
+                        GL_RGBA, GL_UNSIGNED_INT_8_8_8_8,
+                        canvas.raw()));
         }
 
         // Calculate the position to center the image
@@ -116,13 +144,14 @@ int main(int, char**)
             ImGui::End();
         }
 
-
         // Rendering
         ImGui::Render();
         auto display = Window::get_framebuffer_size();
+
         glViewport(0, 0, display.first, display.second);
-        glClearColor(clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w);
+        glClearColor(clear_color.x, clear_color.y, clear_color.z, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
+
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
         Window::swap_buffers();
