@@ -78,9 +78,18 @@ int main(int, char**)
     {
         glfwPollEvents();
 
+        float c_width = static_cast<float>(canvas.get_width());
+        float c_height = static_cast<float>(canvas.get_height());
+
         for (int y = 0; y < canvas.get_height(); y++) {
             for (int x = 0; x < canvas.get_width(); x++) {
-                canvas.set_pixel(x, y, per_pixel(x, y));
+                // Map pixel to nds coords with aspect ratio fix
+                auto viewport_coords = glm::vec2(
+                        (2.f * static_cast<float>(x) - c_width) / c_height,
+                        (2.f * static_cast<float>(canvas.get_height() - y) - c_height) / c_height
+                );
+
+                canvas.set_pixel(x, y, per_pixel(viewport_coords));
             }
         }
         GLCall(glTexSubImage2D(GL_TEXTURE_2D, 0, 0,0,
