@@ -1,6 +1,6 @@
 #include "cuda_ray_tracer.cuh"
 #include "image.hpp"
-
+#include <stdio.h>
 uint32_t on_sphere_hit(glm::vec3 hit_point, glm::vec3 sphere_pos, float sphere_radius) {
     glm::vec3 light_pos = glm::vec3(0.f, 1.f, 0.f);
 
@@ -22,7 +22,7 @@ uint32_t on_miss() {
 
 uint32_t trace_ray(glm::vec3 origin, glm::vec3 dir) {
     // Sphere
-    glm::vec3 sphere_pos = glm::vec3(0.0f, 0.f, -1.f); // world space position
+    glm::vec3 sphere_pos = glm::vec3(0.0f, 0.f, -1.0f); // world space position
     float sphere_radius = 0.5f;
 
     // -----------
@@ -41,17 +41,19 @@ uint32_t trace_ray(glm::vec3 origin, glm::vec3 dir) {
     return on_miss();
 }
 
-uint32_t per_pixel(glm::vec2 viewport_coords) {
-    // Camera
-    glm::vec3 eye = glm::vec3(0.f, 0.f, 0.f); // world space camera position
-    float focal_length = 1.f; // alpha/2 = 45 degrees
+uint32_t per_pixel(int x, int y, glm::vec2 canvas, glm::vec3 eye, glm::mat4 inv_proj, glm::mat4 inv_view) {
+    // Map pixel to nds coords with aspect ratio fix
+//    auto viewport_coords = glm::vec2(
+//            (2.f * static_cast<float>(x) - canvas.x) / canvas.y,
+//            (2.f * (canvas.y - static_cast<float>(y)) - canvas.y) / canvas.y
+//    );
+    glm::vec2 viewport_coords = { static_cast<float>(x) / canvas.x, (canvas.y - static_cast<float>(y)) / canvas.y };
+    viewport_coords = viewport_coords * 2.0f - 1.0f;
 
-    // -----------------
-    // Pixel's position in the camera space
-    glm::vec3 pixel_pos = glm::vec3(viewport_coords.x, viewport_coords.y, -focal_length);
+    // Pixel's position in the world space
+    glm::vec4 target = inv_proj * glm::vec4(viewport_coords.x, viewport_coords.y, -1.f, 1.f);
+    glm::vec3 dir = glm::vec3(inv_view * glm::vec4(glm::normalize(glm::vec3(target) / target.w), 0.f)); // World space
 
-    // For now camera space == world space, so the direction is
-    glm::vec3 dir = glm::normalize(pixel_pos - eye);
     return trace_ray(eye, dir);
 }
 

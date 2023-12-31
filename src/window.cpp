@@ -6,6 +6,8 @@
 #include "vendor/imgui/backend/imgui_impl_glfw.h"
 #include "vendor/imgui/backend/imgui_impl_opengl3.h"
 
+std::pair<double, double> Window::s_mouse_pos;
+
 uint32_t Window::s_width, Window::s_height;
 uint32_t Window::s_pos_x, Window::s_pos_y;
 
@@ -59,7 +61,7 @@ void Window::init(uint32_t width, uint32_t height) {
     glfwSwapInterval(0);
     glfwSetWindowSizeCallback(s_win_handle, Window::on_resize);
     glfwSetWindowPosCallback(s_win_handle, Window::on_pos);
-
+    glfwSetCursorPosCallback(s_win_handle, Window::on_mouse_move);
 
     // Setup Dear ImGui context
     IMGUI_CHECKVERSION();
@@ -132,6 +134,23 @@ void Window::destroy() {
 
 GLFWwindow *Window::get_win_handle() {
      return s_win_handle;
+}
+
+void Window::on_mouse_move(GLFWwindow *window, double xpos, double ypos) {
+    s_mouse_pos.first = xpos;
+    s_mouse_pos.second = ypos;
+}
+
+bool Window::is_key_pressed(int key) {
+    return glfwGetKey(s_win_handle, key) == GLFW_PRESS;
+}
+
+bool Window::is_mouse_btn_pressed(int key) {
+    return glfwGetMouseButton(s_win_handle, key) == GLFW_PRESS;
+}
+
+std::pair<double, double> Window::get_mouse_pos() {
+    return s_mouse_pos;
 }
 
 

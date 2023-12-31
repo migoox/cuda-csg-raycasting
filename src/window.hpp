@@ -18,6 +18,10 @@ public:
     static bool is_fullscreen() { return s_is_fullscreen; }
     static void toggle_fullscreen();
 
+    static bool is_key_pressed(int key);
+    static bool is_mouse_btn_pressed(int key);
+
+
     static uint32_t get_width() { return s_width; }
     static uint32_t get_height() { return s_height; }
 
@@ -25,6 +29,7 @@ public:
     static uint32_t get_pos_y() { return s_pos_y; }
 
     static std::pair<int, int> get_framebuffer_size();
+    static std::pair<double, double> get_mouse_pos();
 
     static void swap_buffers();
 
@@ -32,9 +37,12 @@ private:
     static void on_resize(GLFWwindow* window, int width, int height);
     static void on_pos(GLFWwindow* window, int x, int y);
     static void on_glfw_error(int error, const char* description);
+    static void on_mouse_move(GLFWwindow* window, double xpos, double ypos);
 
 
 private:
+    static std::pair<double, double> s_mouse_pos;
+
     static uint32_t s_width, s_height;
     static uint32_t s_pos_x, s_pos_y;
 

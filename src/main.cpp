@@ -12,6 +12,8 @@
 
 #include "cuda_ray_tracer.cuh"
 
+#include "camera.h"
+
 #define GL_SILENCE_DEPRECATION
 #if defined(IMGUI_IMPL_OPENGL_ES2)
 #include <GLES2/gl2.h>
@@ -32,8 +34,47 @@ std::vector<std::pair<int, int>> get_supported_resolutions() {
 
     return resolutions;
 }
+void update_camera(camera::FPCamera& camera, float dt) {
+    static glm::vec2 last_mouse_pos = glm::vec2(Window::get_mouse_pos().first, Window::get_mouse_pos().second);
+    float sensitivity = 0.02f;
+    glm::vec2 mouse_pos = glm::vec2(Window::get_mouse_pos().first, Window::get_mouse_pos().second);
+    glm::vec2 mouse_delta = (mouse_pos - last_mouse_pos) * sensitivity;
+    last_mouse_pos = mouse_pos;
 
+    if (!Window::is_mouse_btn_pressed(GLFW_MOUSE_BUTTON_RIGHT)) {
+        glfwSetInputMode(Window::get_win_handle(), GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+        return;
+    }
 
+    glfwSetInputMode(Window::get_win_handle(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+
+    float speed = 0.3f;
+    float r = 0.f, u = 0.f, f = 0.f;
+
+    if (Window::is_key_pressed(GLFW_KEY_W)) {
+        f += speed * dt;
+    }
+    else if (Window::is_key_pressed(GLFW_KEY_S)) {
+        f -= speed * dt;
+    }
+
+    if (Window::is_key_pressed(GLFW_KEY_A)) {
+        r -= speed * dt;
+    }
+    else if (Window::is_key_pressed(GLFW_KEY_D)) {
+        r += speed * dt;
+    }
+
+    if (Window::is_key_pressed(GLFW_KEY_Q)) {
+        u -= speed * dt;
+    }
+    else if (Window::is_key_pressed(GLFW_KEY_E)) {
+        u += speed * dt;
+    }
+
+    camera.rotate(-mouse_delta.y * 0.03f, -mouse_delta.x * 0.03f);
+    camera.move(r, u, f);
+}
 // Main code
 int main(int, char**)
 {
@@ -56,6 +97,8 @@ int main(int, char**)
     int selected_res = supp_res.size() - 1;
 
     // INIT
+    camera::FPCamera camera(supp_res[selected_res].first, supp_res[selected_res].second, glm::radians(45.f), 0.1f, 500.f);
+
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
     img::Image canvas(supp_res[selected_res].first, supp_res[selected_res].second);
     canvas.clear(0x0000FFFF);
@@ -77,19 +120,12 @@ int main(int, char**)
     while (!Window::should_close())
     {
         glfwPollEvents();
+        update_camera(camera, 0.1f);
 
-        float c_width = static_cast<float>(canvas.get_width());
-        float c_height = static_cast<float>(canvas.get_height());
-
+        glm::vec2 canvas_size(static_cast<float>(canvas.get_width()), static_cast<float>(canvas.get_height()));
         for (int y = 0; y < canvas.get_height(); y++) {
             for (int x = 0; x < canvas.get_width(); x++) {
-                // Map pixel to nds coords with aspect ratio fix
-                auto viewport_coords = glm::vec2(
-                        (2.f * static_cast<float>(x) - c_width) / c_height,
-                        (2.f * static_cast<float>(canvas.get_height() - y) - c_height) / c_height
-                );
-
-                canvas.set_pixel(x, y, per_pixel(viewport_coords));
+                canvas.set_pixel(x, y, per_pixel(x, y, canvas_size, camera.get_pos(), camera.get_inverse_proj(), camera.get_inverse_view()));
             }
         }
         GLCall(glTexSubImage2D(GL_TEXTURE_2D, 0, 0,0,
