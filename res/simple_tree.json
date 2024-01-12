@@ -9,8 +9,8 @@
             {
                 "id": 2,
                 "type": "sphere",
-                "radius": 3,
-                "center": { "x": 0, "y": 0, "z": 3 }
+                "radius": 1.4,
+                "center": { "x": 1.0, "y": 1.0, "z": -5.0 }
             }, 
             {
                 "id": 3,
@@ -19,14 +19,14 @@
             {
                 "id": 6,
                 "type": "sphere",
-                "radius": 1,
-                "center": { "x": 0, "y": 0, "z": 0 }
+                "radius": 1.0,
+                "center": { "x": 0.0, "y": 0.0, "z": -5.0 }
             },
             {
                 "id": 7,
                 "type": "sphere",
-                "radius": 2,
-                "center": { "x": 2, "y": 0, "z": 0 }
+                "radius": 2.0,
+                "center": { "x": 2.0, "y": 0.0, "z": -5.0 }
             }
         ]
     }

@@ -13,7 +13,7 @@
 #include "vendor/imgui/backend/imgui_impl_opengl3.h"
 #include "billboard.hpp"
 
-#include "cpu_raytracer.hpp"
+#include "cpu_raycaster.hpp"
 #include "csg.hpp"
 
 #if defined(_MSC_VER) && (_MSC_VER >= 1900) && !defined(IMGUI_DISABLE_WIN32_FUNCTIONS)
@@ -25,14 +25,15 @@ using namespace renderer;
 const int INIT_SCREEN_SIZE_X = 800;
 const int INIT_SCREEN_SIZE_Y = 600;
 
-void update_canvas(Image& canvas, app::CameraOperator& cam_operator) {
+void update_canvas(Image& canvas, app::CameraOperator& cam_operator, const csg::CSGTree& tree) {
     for (int y = 0; y < canvas.get_height(); y++) {
         for (int x = 0; x < canvas.get_width(); x++) {
             canvas.set_pixel(x, y, cpu_raytracer::per_pixel(x, y,
                                                             glm::vec2(canvas.get_width(), canvas.get_height()),
                                                             cam_operator.get_cam().get_pos(),
                                                             cam_operator.get_cam().get_inv_proj(),
-                                                            cam_operator.get_cam().get_inv_view()));
+                                                            cam_operator.get_cam().get_inv_view(),
+                                                            tree));
         }
     }
 }
@@ -68,7 +69,7 @@ int main(int, char**) {
         std::chrono::steady_clock::time_point current_time = std::chrono::steady_clock::now();
         std::chrono::steady_clock::time_point previous_time = current_time;
 
-        update_canvas(canvas, cam_operator);
+        update_canvas(canvas, cam_operator, tree);
         txt_res->update(canvas);
 
         // Main loop
@@ -93,7 +94,7 @@ int main(int, char**) {
             previous_time = current_time;
 
             if (cam_operator.update(window, delta_time.count())) {
-                update_canvas(canvas, cam_operator);
+                update_canvas(canvas, cam_operator, tree);
                 txt_res->update(canvas);
             }
 
