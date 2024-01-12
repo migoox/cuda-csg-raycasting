@@ -1,206 +1,114 @@
 #define GLM_FORCE_CUDA
-#include <vector>
 #include <glm/glm.hpp>
 
-#include "imgui_internal.h"
+#include <GL/glew.h>
+#include "gl_debug.h"
+#include "camera.hpp"
+#include "shader_program.hpp"
+#include "window.hpp"
+#include "textures.hpp"
+
+#include "camera_operator.h"
 #include "imgui.h"
 #include "vendor/imgui/backend/imgui_impl_glfw.h"
 #include "vendor/imgui/backend/imgui_impl_opengl3.h"
-#include "gl_debug.h"
-#include "image.hpp"
-#include "window.hpp"
+#include "billboard.h"
 
-#include "cuda_ray_tracer.cuh"
-
-#include "camera.h"
-
-#define GL_SILENCE_DEPRECATION
-#if defined(IMGUI_IMPL_OPENGL_ES2)
-#include <GLES2/gl2.h>
-#endif
-#include <GLFW/glfw3.h> // Will drag system OpenGL headers
+#include "cuda_raytracer.cuh"
 
 #if defined(_MSC_VER) && (_MSC_VER >= 1900) && !defined(IMGUI_DISABLE_WIN32_FUNCTIONS)
 #pragma comment(lib, "legacy_stdio_definitions")
 #endif
 
-std::vector<std::pair<int, int>> get_supported_resolutions() {
-    std::vector<std::pair<int, int>> resolutions;
-    resolutions.emplace_back(1920, 1080);
-    resolutions.emplace_back(1440, 900);
-    resolutions.emplace_back(1280, 720);
-    resolutions.emplace_back(1024, 768);
-    resolutions.emplace_back(640, 360);
+using namespace renderer;
 
-    return resolutions;
-}
-void update_camera(camera::FPCamera& camera, float dt) {
-    static glm::vec2 last_mouse_pos = glm::vec2(Window::get_mouse_pos().first, Window::get_mouse_pos().second);
-    float sensitivity = 0.02f;
-    glm::vec2 mouse_pos = glm::vec2(Window::get_mouse_pos().first, Window::get_mouse_pos().second);
-    glm::vec2 mouse_delta = (mouse_pos - last_mouse_pos) * sensitivity;
-    last_mouse_pos = mouse_pos;
-
-    if (!Window::is_mouse_btn_pressed(GLFW_MOUSE_BUTTON_RIGHT)) {
-        glfwSetInputMode(Window::get_win_handle(), GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-        return;
-    }
-
-    glfwSetInputMode(Window::get_win_handle(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-
-    float speed = 0.3f;
-    float r = 0.f, u = 0.f, f = 0.f;
-
-    if (Window::is_key_pressed(GLFW_KEY_W)) {
-        f += speed * dt;
-    }
-    else if (Window::is_key_pressed(GLFW_KEY_S)) {
-        f -= speed * dt;
-    }
-
-    if (Window::is_key_pressed(GLFW_KEY_A)) {
-        r -= speed * dt;
-    }
-    else if (Window::is_key_pressed(GLFW_KEY_D)) {
-        r += speed * dt;
-    }
-
-    if (Window::is_key_pressed(GLFW_KEY_Q)) {
-        u -= speed * dt;
-    }
-    else if (Window::is_key_pressed(GLFW_KEY_E)) {
-        u += speed * dt;
-    }
-
-    camera.rotate(-mouse_delta.y * 0.03f, -mouse_delta.x * 0.03f);
-    camera.move(r, u, f);
-}
+const int INIT_SCREEN_SIZE_X = 600;
+const int INIT_SCREEN_SIZE_Y = 300;
 // Main code
-int main(int, char**)
-{
-    Window::init(1280, 720);
-
-    ImGuiWindowFlags windowFlags = ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize;
-
-    // Get supported resolutions
-    std::vector<std::pair<int, int>> supp_res = get_supported_resolutions();
-    char res_items[1024];
+int main(int, char**) {
+    // Init GLFW
+    Backend::init_glfw();
     {
-        size_t curr_offset = 0;
-        for (int i = 0; i < supp_res.size(); i++) {
-            std::string curr_res = std::to_string(supp_res[i].first) + "x" + std::to_string(supp_res[i].second);
-            strcpy(res_items + curr_offset, curr_res.c_str());
-            curr_offset += curr_res.size() + 1;
-        }
-        res_items[curr_offset] = '\0';
-    }
-    int selected_res = supp_res.size() - 1;
+        // Create a window
+        Window window(INIT_SCREEN_SIZE_X, INIT_SCREEN_SIZE_Y, "OpenGL 3D scenery");
 
-    // INIT
-    camera::FPCamera camera(supp_res[selected_res].first, supp_res[selected_res].second, glm::radians(45.f), 0.1f, 500.f);
+        // Init GLEW and ImGui
+        Backend::init_glew();
+        Backend::init_imgui(window);
 
-    ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
-    img::Image canvas(supp_res[selected_res].first, supp_res[selected_res].second);
-    canvas.clear(0x0000FFFF);
+        // Application state
+        ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
-    GLuint canvas_texture;
-    GLCall(glGenTextures(1, &canvas_texture));
-    GLCall(glBindTexture(GL_TEXTURE_2D, canvas_texture));
-    GLCall(glPixelStorei(GL_UNPACK_ALIGNMENT, 1));
-    GLCall(glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA,
-                        canvas.get_width(), canvas.get_height(), 0,
-                        GL_RGBA, GL_UNSIGNED_INT_8_8_8_8,
-                        canvas.raw()));
+        std::string executable_dir = std::filesystem::path(__FILE__).parent_path().string();
+        ShaderProgram sh(executable_dir + "/../res/billboard.vert", executable_dir + "/../res/billboard.frag");
+        sh.bind();
+        sh.set_uniform_1i("u_texture", 0);
 
-    GLCall(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR));
-    GLCall(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR));
-    GLCall(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT));
-    GLCall(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT));
+        Image canvas = Image(INIT_SCREEN_SIZE_X, INIT_SCREEN_SIZE_Y, 0xFF0000FF);
+        auto txt_res = std::make_shared<TextureResource>(canvas);
+        Texture txt = Texture(txt_res);
 
-    while (!Window::should_close())
-    {
-        glfwPollEvents();
-        update_camera(camera, 0.1f);
+        app::CameraOperator cam_operator((float)INIT_SCREEN_SIZE_X, (float)INIT_SCREEN_SIZE_Y, glm::radians(90.f), 0.1f, 1000.f);
+        app::Billboard billboard;
 
-        glm::vec2 canvas_size(static_cast<float>(canvas.get_width()), static_cast<float>(canvas.get_height()));
-        for (int y = 0; y < canvas.get_height(); y++) {
-            for (int x = 0; x < canvas.get_width(); x++) {
-                canvas.set_pixel(x, y, per_pixel(x, y, canvas_size, camera.get_pos(), camera.get_inverse_proj(), camera.get_inverse_view()));
+        std::chrono::steady_clock::time_point current_time = std::chrono::steady_clock::now();
+        std::chrono::steady_clock::time_point previous_time = current_time;
+        float dt_as_seconds = 0.f;
+
+        // Main loop
+        while (!window.should_close()) {
+            glfwPollEvents();
+
+            // Start the Dear ImGui frame
+            ImGui_ImplOpenGL3_NewFrame();
+            ImGui_ImplGlfw_NewFrame();
+            ImGui::NewFrame();
+            {
+                ImGui::Begin("Controls");
+                ImGui::Button("Load Scene");
+                ImGui::End();
             }
+
+            ImGui::Render();
+
+            // Calculate delta time
+            current_time = std::chrono::steady_clock::now();
+            std::chrono::duration<float> delta_time = std::chrono::duration_cast<std::chrono::duration<float>>(current_time - previous_time);
+            previous_time = current_time;
+
+            if (cam_operator.update(window, dt_as_seconds)) {
+                for (int y = 0; y < canvas.get_height(); y++) {
+                    for (int x = 0; x < canvas.get_width(); x++) {
+                        canvas.set_pixel(x, y, raytracer::per_pixel(x, y, glm::vec2(canvas.get_width(), canvas.get_height()),
+                                                                    cam_operator.get_cam().get_pos(),
+                                                                    (const glm::vec<4, float, (glm::qualifier) 2> &) cam_operator.get_cam().get_inv_proj(),
+                                                                    (const glm::vec<4, float, (glm::qualifier) 2> &) cam_operator.get_cam().get_inv_view()));
+                        txt_res->update(canvas);
+                    }
+                }
+            }
+
+            // Update opengl viewport
+            auto fb_size = window.get_framebuffer_size();
+            glViewport(0, 0, fb_size.x, fb_size.y);
+
+            // Clear framebuffer
+            glClearColor(clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w);
+            glClear(GL_COLOR_BUFFER_BIT);
+
+
+            sh.bind();
+            txt.bind(0);
+            billboard.draw();
+
+            ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
+            window.swap_buffers();
         }
-        GLCall(glTexSubImage2D(GL_TEXTURE_2D, 0, 0,0,
-                               canvas.get_width(), canvas.get_height(),
-                        GL_RGBA, GL_UNSIGNED_INT_8_8_8_8,
-                        canvas.raw()));
-
-        // Start the Dear ImGui frame
-        ImGui_ImplOpenGL3_NewFrame();
-        ImGui_ImplGlfw_NewFrame();
-        ImGui::NewFrame();
-
-        auto height = static_cast<float>(Window::get_height());
-        auto width_win1 = static_cast<float>(Window::get_width()) / 4.f * 3.f;
-        auto width_win2 = static_cast<float>(Window::get_width()) / 4.f;
-        ImVec2 win1_size = ImVec2(width_win1, height);
-        ImVec2 win2_size = ImVec2(width_win2, height);
-
-        if (Window::is_fullscreen()) {
-            ImGui::SetNextWindowPos(ImVec2(0, 0));
-            ImGui::SetNextWindowSize(ImVec2(Window::get_width(), Window::get_height()));
-            win1_size = ImVec2(Window::get_width(), Window::get_height());
-        } else {
-            ImGui::SetNextWindowPos(ImVec2(0, 0));
-            ImGui::SetNextWindowSize(win1_size);
-        }
-
-        ImGui::Begin("Window 1", nullptr, windowFlags);
-
-        if (ImGui::Button("Toggle Fullscreen")) {
-            Window::toggle_fullscreen();
-        }
-
-        // Display supported resolutions in a combo box
-        ImGui::SameLine();
-        if (ImGui::Combo("##Resolution", &selected_res, res_items, std::max(6, (int)supp_res.size()))) {
-            canvas.resize(supp_res[selected_res].first, supp_res[selected_res].second);
-            camera.resize_proj(supp_res[selected_res].first, supp_res[selected_res].second);
-            canvas.clear(0x0000FFFF);
-            GLCall(glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA,
-                        canvas.get_width(), canvas.get_height(), 0,
-                        GL_RGBA, GL_UNSIGNED_INT_8_8_8_8,
-                        canvas.raw()));
-        }
-
-        // Calculate the position to center the image
-        ImVec2 img_size(canvas.get_width(), canvas.get_height());
-        ImVec2 img_pos = ImGui::GetCursorScreenPos();
-        img_pos.x += (win1_size.x - img_size.x) * 0.5f;
-        img_pos.y += (win1_size.y - img_size.y) * 0.5f;
-
-        // Display the image at the calculated position
-        ImGui::SetCursorScreenPos(img_pos);
-        ImGui::Image((void*)(intptr_t)canvas_texture, img_size);
-        ImGui::End();
-
-        if (!Window::is_fullscreen()) {
-            ImGui::SetNextWindowPos(ImVec2(width_win1, 0));
-            ImGui::SetNextWindowSize(win2_size);
-            ImGui::Begin("Window 2", nullptr, windowFlags);
-
-            ImGui::End();
-        }
-
-        // Rendering
-        ImGui::Render();
-        auto display = Window::get_framebuffer_size();
-
-        glViewport(0, 0, display.first, display.second);
-        glClearColor(clear_color.x, clear_color.y, clear_color.z, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT);
-
-        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-
-        Window::swap_buffers();
+        //Backend::terminate_imgui();
+        // glfw window terminates here
     }
+    Backend::terminate_glfw();
+
     return 0;
 }

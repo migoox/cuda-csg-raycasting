@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.26)
 
 # Allow cuda and cpp languages
-project(csg-ray-tracing LANGUAGES CXX CUDA)
+project(cuda-csg-raycasting LANGUAGES CXX CUDA)
 
 # Set cpp standard
 set(CMAKE_CUDA_STANDARD 17)
@@ -13,10 +13,12 @@ include_directories(${CUDA_INCLUDE_DIRS})
 
 # Find patterns with these patterns and add them to sources
 file(GLOB SOURCES
-    "src/*.cpp"
-    "src/*.hpp"
-    "src/*.h"
-    "src/*.cu"
+        "src/*.cpp"
+        "src/*.hpp"
+        "src/*.h"
+        "src/*.cu"
+        "src/*.cuh"
+        "src/vendor/stbi_image.h"
 )
 
 add_subdirectory(src/vendor)
@@ -36,30 +38,19 @@ else()
 endif()
 
 # Create an executable from the source files
-add_executable(csg-ray-tracing ${SOURCES})
+add_executable(cuda-csg-raycasting ${SOURCES})
 
 # Link the executable to the external libraries
-target_link_libraries(csg-ray-tracing
+target_link_libraries(cuda-csg-raycasting
     ImGui
     ${EXTERNAL_LIBS}
 )
 
 # Generate separate object files for each CUDA source file
-set_target_properties(csg-ray-tracing PROPERTIES
+set_target_properties(cuda-csg-raycasting PROPERTIES
     CUDA_SEPARABLE_COMPILATION ON
 )
 
 # Include CUDA directories
 include_directories(${CUDA_INCLUDE_DIRS})
-
-# WINDOWS POSTBUILD -- copy the .dll files into Relase/Debug folder
-if (WIN32)
-	add_custom_command(
-		TARGET ${PROJECT_NAME}  POST_BUILD
-		COMMAND ${CMAKE_COMMAND} -E copy
-			${CMAKE_CURRENT_BINARY_DIR}/dependencies/bin/glfw3.dll
-			${CMAKE_CURRENT_BINARY_DIR}/dependencies/bin/glew32.dll
-			${CMAKE_CURRENT_BINARY_DIR}/$<IF:$<CONFIG:Debug>,Debug,Release>
-	)
-endif()
 

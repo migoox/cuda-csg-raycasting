@@ -5,7 +5,7 @@
 #include <string>
 #include <unordered_map>
 
-namespace common {
+namespace renderer {
     class ShaderProgram {
     public:
         ShaderProgram(const std::string &vert_path, const std::string &frag_path);
@@ -16,6 +16,7 @@ namespace common {
         void bind() const;
         static void unbind();
 
+        void set_uniform_1b(const char* name, bool value);
         void set_uniform_1i(const char* name, int value);
         void set_uniform_2i(const char* name, int v1, int v2);
         void set_uniform_1f(const char* name, float value);

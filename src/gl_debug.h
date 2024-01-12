@@ -1,7 +1,7 @@
 #ifndef GL_DEBUG_H
 #define GL_DEBUG_H
 
-#include <GL/glew.h>
+#include "GL/glew.h"
 
 #include <iostream>
 #include <stdint.h>

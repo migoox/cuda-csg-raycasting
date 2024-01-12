@@ -1,57 +1,74 @@
-#ifndef CSG_RAY_TRACING_WINDOW_H
-#define CSG_RAY_TRACING_WINDOW_H
+#ifndef OPENGL_3D_SCENERY_WINDOW_HPP
+#define OPENGL_3D_SCENERY_WINDOW_HPP
 
-#include <cstdint>
-#include "GLFW/glfw3.h"
-#include "imgui.h"
-#include <vector>
+#include <string>
+#include <GL/glew.h>
+#include <GLFW/glfw3.h>
 
-class Window {
+namespace renderer {
+    struct Vec2i {
+        int x, y;
+    };
+    struct Vec2f {
+        float x, y;
+    };
 
-public:
-    static void init(uint32_t width, uint32_t height);
-    static void destroy();
+    enum class MouseButton {
+        Left,
+        Middle,
+        Right
+    };
 
-    static GLFWwindow* get_win_handle();
+    class Window;
 
-    static bool should_close() { return glfwWindowShouldClose(s_win_handle); }
-    static bool is_fullscreen() { return s_is_fullscreen; }
-    static void toggle_fullscreen();
+    class Backend {
+    public:
+        static void init_imgui(Window& window);
+        static void terminate_imgui();
 
-    static bool is_key_pressed(int key);
-    static bool is_mouse_btn_pressed(int key);
+        static void init_glfw();
+        static void terminate_glfw();
+        static int to_glfw_mouse_btn_key(MouseButton mouse_button);
 
+        static void init_glew();
+    private:
+        static std::string glsl_version;
+    };
 
-    static uint32_t get_width() { return s_width; }
-    static uint32_t get_height() { return s_height; }
+    class Window {
+    public:
+        Window() = delete;
+        Window(int width, int height, const char* title);
+        ~Window();
 
-    static uint32_t get_pos_x() { return s_pos_x; }
-    static uint32_t get_pos_y() { return s_pos_y; }
+        const Vec2i& get_pos() const { return m_pos; }
+        const Vec2i& get_size() const { return m_size; }
+        const Vec2f& get_mouse_pos() const { return m_mouse_pos; }
+        Vec2i get_framebuffer_size() const;
 
-    static std::pair<int, int> get_framebuffer_size();
-    static std::pair<double, double> get_mouse_pos();
+        bool is_key_pressed(int key) const;
+        bool is_mouse_btn_pressed(MouseButton btn) const;
 
-    static void swap_buffers();
+        void set_cursor_mode(int value) const;
 
-private:
-    static void on_resize(GLFWwindow* window, int width, int height);
-    static void on_pos(GLFWwindow* window, int x, int y);
-    static void on_glfw_error(int error, const char* description);
-    static void on_mouse_move(GLFWwindow* window, double xpos, double ypos);
+        GLFWwindow *get_raw() { return m_glfw_window; }
 
+        bool should_close() const;
+        void swap_buffers();
 
-private:
-    static std::pair<double, double> s_mouse_pos;
+    private:
+        static void glfw_on_win_resized(GLFWwindow *glfw_window, int width, int height);
+        static void glfw_on_win_moved(GLFWwindow *glfw_window, int x, int y);
+        static void glfw_on_mouse_moved(GLFWwindow *glfw_window, double xpos, double ypos);
 
-    static uint32_t s_width, s_height;
-    static uint32_t s_pos_x, s_pos_y;
+    private:
+        GLFWwindow* m_glfw_window;
 
-    static ImVec2 s_old_size;
-    static ImVec2 s_old_pos;
-    static bool s_is_fullscreen;
+        Vec2i m_size;
+        Vec2i m_pos = { 0, 0 };
 
-    static GLFWwindow* s_win_handle;
-};
+        Vec2f m_mouse_pos = { 0.f, 0.f };
+    };
+}
 
-
-#endif //CSG_RAY_TRACING_WINDOW_H
+#endif //OPENGL_3D_SCENERY_WINDOW_HPP
