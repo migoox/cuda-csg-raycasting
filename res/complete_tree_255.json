@@ -1,5 +1,6 @@
 {
   "scene": {
+    "max_id": 255,
     "objects": [
       {
         "id": 1,
