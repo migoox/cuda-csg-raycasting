@@ -1,4 +1,4 @@
-#include "billboard.h"
+#include "billboard.hpp"
 
 app::Billboard::Billboard()
 : m_vao(0), m_vbo(0), m_ebo(0) {

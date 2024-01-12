@@ -1,4 +1,4 @@
-#include "camera_operator.h"
+#include "camera_operator.hpp"
 
 app::CameraOperator::CameraOperator(float width, float height, float fov, float znear, float zfar)
 : m_cam(width, height, fov, znear, zfar) { }

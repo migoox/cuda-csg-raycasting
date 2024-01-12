@@ -19,6 +19,8 @@ file(GLOB SOURCES
         "src/*.cu"
         "src/*.cuh"
         "src/vendor/stbi_image.h"
+        "src/vendor/nlohmann/json.hpp"
+        "src/vendor/nlohmann/json_fwd.hpp"
 )
 
 add_subdirectory(src/vendor)

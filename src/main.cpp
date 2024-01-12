@@ -7,13 +7,14 @@
 #include "window.hpp"
 #include "textures.hpp"
 
-#include "camera_operator.h"
+#include "camera_operator.hpp"
 #include "imgui.h"
 #include "vendor/imgui/backend/imgui_impl_glfw.h"
 #include "vendor/imgui/backend/imgui_impl_opengl3.h"
-#include "billboard.h"
+#include "billboard.hpp"
 
-#include "cpu_raytracer.h"
+#include "cpu_raytracer.hpp"
+#include "csg.hpp"
 
 #if defined(_MSC_VER) && (_MSC_VER >= 1900) && !defined(IMGUI_DISABLE_WIN32_FUNCTIONS)
 #pragma comment(lib, "legacy_stdio_definitions")
@@ -52,6 +53,7 @@ int main(int, char**) {
         ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
         std::string executable_dir = std::filesystem::path(__FILE__).parent_path().string();
+        csg::CSGTree tree = csg::CSGTree(executable_dir + "/../res/csg_tree_example1.json");
         ShaderProgram sh(executable_dir + "/../res/billboard.vert", executable_dir + "/../res/billboard.frag");
         sh.bind();
         sh.set_uniform_1i("u_texture", 0);
