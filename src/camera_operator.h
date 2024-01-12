@@ -10,6 +10,7 @@ namespace app {
         CameraOperator(float width, float height, float fov, float znear, float zfar);
 
         renderer::FPCamera& get_cam() { return m_cam; }
+        const renderer::FPCamera& get_cam() const { return m_cam; }
         bool update(const renderer::Window& window, float dt);
 
     private:

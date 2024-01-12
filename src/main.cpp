@@ -1,4 +1,3 @@
-#define GLM_FORCE_CUDA
 #include <glm/glm.hpp>
 
 #include <GL/glew.h>
@@ -14,7 +13,7 @@
 #include "vendor/imgui/backend/imgui_impl_opengl3.h"
 #include "billboard.h"
 
-#include "cuda_raytracer.cuh"
+#include "cpu_raytracer.h"
 
 #if defined(_MSC_VER) && (_MSC_VER >= 1900) && !defined(IMGUI_DISABLE_WIN32_FUNCTIONS)
 #pragma comment(lib, "legacy_stdio_definitions")
@@ -22,8 +21,21 @@
 
 using namespace renderer;
 
-const int INIT_SCREEN_SIZE_X = 600;
-const int INIT_SCREEN_SIZE_Y = 300;
+const int INIT_SCREEN_SIZE_X = 800;
+const int INIT_SCREEN_SIZE_Y = 600;
+
+void update_canvas(Image& canvas, app::CameraOperator& cam_operator) {
+    for (int y = 0; y < canvas.get_height(); y++) {
+        for (int x = 0; x < canvas.get_width(); x++) {
+            canvas.set_pixel(x, y, cpu_raytracer::per_pixel(x, y,
+                                                            glm::vec2(canvas.get_width(), canvas.get_height()),
+                                                            cam_operator.get_cam().get_pos(),
+                                                            cam_operator.get_cam().get_inv_proj(),
+                                                            cam_operator.get_cam().get_inv_view()));
+        }
+    }
+}
+
 // Main code
 int main(int, char**) {
     // Init GLFW
@@ -48,12 +60,14 @@ int main(int, char**) {
         auto txt_res = std::make_shared<TextureResource>(canvas);
         Texture txt = Texture(txt_res);
 
-        app::CameraOperator cam_operator((float)INIT_SCREEN_SIZE_X, (float)INIT_SCREEN_SIZE_Y, glm::radians(90.f), 0.1f, 1000.f);
+        app::CameraOperator cam_operator((float)INIT_SCREEN_SIZE_X, (float)INIT_SCREEN_SIZE_Y, glm::radians(45.f), 0.1f, 1000.f);
         app::Billboard billboard;
 
         std::chrono::steady_clock::time_point current_time = std::chrono::steady_clock::now();
         std::chrono::steady_clock::time_point previous_time = current_time;
-        float dt_as_seconds = 0.f;
+
+        update_canvas(canvas, cam_operator);
+        txt_res->update(canvas);
 
         // Main loop
         while (!window.should_close()) {
@@ -76,16 +90,9 @@ int main(int, char**) {
             std::chrono::duration<float> delta_time = std::chrono::duration_cast<std::chrono::duration<float>>(current_time - previous_time);
             previous_time = current_time;
 
-            if (cam_operator.update(window, dt_as_seconds)) {
-                for (int y = 0; y < canvas.get_height(); y++) {
-                    for (int x = 0; x < canvas.get_width(); x++) {
-                        canvas.set_pixel(x, y, raytracer::per_pixel(x, y, glm::vec2(canvas.get_width(), canvas.get_height()),
-                                                                    cam_operator.get_cam().get_pos(),
-                                                                    (const glm::vec<4, float, (glm::qualifier) 2> &) cam_operator.get_cam().get_inv_proj(),
-                                                                    (const glm::vec<4, float, (glm::qualifier) 2> &) cam_operator.get_cam().get_inv_view()));
-                        txt_res->update(canvas);
-                    }
-                }
+            if (cam_operator.update(window, delta_time.count())) {
+                update_canvas(canvas, cam_operator);
+                txt_res->update(canvas);
             }
 
             // Update opengl viewport
@@ -95,7 +102,6 @@ int main(int, char**) {
             // Clear framebuffer
             glClearColor(clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w);
             glClear(GL_COLOR_BUFFER_BIT);
-
 
             sh.bind();
             txt.bind(0);

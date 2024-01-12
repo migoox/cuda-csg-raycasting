@@ -1,10 +1,19 @@
-#include "cuda_raytracer.cuh"
+#define GLM_FORCE_CUDA
+#include <glm/glm.hpp>
+#include "cpu_raytracer.h"
 #include "textures.hpp"
 #include "cuda_runtime.h"
+#include <cublas_v2.h>
 
-namespace raytracer {
+
+namespace cpu_raytracer {
+    using namespace glm;
+
     uint32_t on_sphere_hit(vec3 hit_point, vec3 sphere_pos, float sphere_radius) {
-        vec3 light_pos = vec3(0.f, 1.f, 0.f);
+        vec3 light_pos;
+        light_pos.x = 0.f;
+        light_pos.y = 1.f;
+        light_pos.z = 0.f;
 
         vec3 normal = normalize(hit_point - sphere_pos);
 
@@ -49,7 +58,7 @@ namespace raytracer {
 //            (2.f * static_cast<float>(x) - canvas.x) / canvas.y,
 //            (2.f * (canvas.y - static_cast<float>(y)) - canvas.y) / canvas.y
 //    );
-        vec2 viewport_coords = { static_cast<float>(x) / canvas.x, (canvas.y - static_cast<float>(y)) / canvas.y };
+        vec2 viewport_coords = { static_cast<float>(x) / canvas.x, (static_cast<float>(y)) / canvas.y };
         viewport_coords = viewport_coords * 2.0f - 1.0f;
 
         // Pixel's position in the world space
