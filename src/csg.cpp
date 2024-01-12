@@ -45,7 +45,7 @@ csg::CSGTree::CSGTree(const std::string &path) {
     file >> j;
 
     int p = static_cast<int>(std::ceil(std::log2(static_cast<double>(j["scene"]["max_id"]))));
-    m_node_array.resize(std::pow(2, p) + 1, Node(-1, -1, Node::None));
+    m_node_array.resize(std::pow(2, p), Node(-1, -1, Node::None));
 
     const auto& objects = j["scene"]["objects"];
 
@@ -57,7 +57,7 @@ csg::CSGTree::CSGTree(const std::string &path) {
         if (obj["type"] == "sphere") {
             m_radiuses.push_back(obj["radius"]);
             m_centers.emplace_back(obj["center"]["x"], obj["center"]["y"], obj["center"]["z"]);
-            prim_id = m_centers.size() - 1;
+            prim_id = m_centers.size();
         }
 
         m_node_array[id] = Node(id, prim_id, type);

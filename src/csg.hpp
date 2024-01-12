@@ -53,5 +53,4 @@ namespace csg {
 
 }
 
-
 #endif //CUDA_CSG_RAYCASTING_CSG_TREE_H
