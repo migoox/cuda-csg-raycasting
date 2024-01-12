@@ -163,6 +163,7 @@ int main(int, char**)
         ImGui::SameLine();
         if (ImGui::Combo("##Resolution", &selected_res, res_items, std::max(6, (int)supp_res.size()))) {
             canvas.resize(supp_res[selected_res].first, supp_res[selected_res].second);
+            camera.resize_proj(supp_res[selected_res].first, supp_res[selected_res].second);
             canvas.clear(0x0000FFFF);
             GLCall(glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA,
                         canvas.get_width(), canvas.get_height(), 0,

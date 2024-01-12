@@ -70,7 +70,7 @@ void FPCamera::recalculate_proj() {
     m_inverse_proj[3][2] = -1.f;
     m_inverse_proj[3][3] = (m_znear + m_zfar) / (2.f * m_zfar * m_znear);
 
-    //m_inverse_proj = glm::inverse(glm::perspective(glm::radians(45.f), m_width / m_height, m_znear, m_zfar));
+    m_inverse_proj = glm::inverse(glm::perspective(glm::radians(45.f), m_width / m_height, m_znear, m_zfar));
 }
 
 void FPCamera::recalculate_view() {
