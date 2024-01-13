@@ -55,9 +55,14 @@ csg::CSGTree::CSGTree(const std::string &path) {
         auto type = str_to_type(obj["type"]);
 
         if (obj["type"] == "sphere") {
-            m_radiuses.push_back(obj["radius"]);
-            m_centers.emplace_back(obj["center"]["x"], obj["center"]["y"], obj["center"]["z"]);
-            prim_id = m_centers.size() - 1;
+            m_sphere_radiuses.push_back(obj["radius"]);
+            m_sphere_centers.emplace_back(obj["center"]["x"], obj["center"]["y"], obj["center"]["z"]);
+            if (obj.contains("color")) {
+                m_sphere_colors.emplace_back(obj["color"]["r"], obj["color"]["g"], obj["color"]["b"]);
+            } else {
+                m_sphere_colors.emplace_back(1.f, 0.f, 0.f);
+            }
+            prim_id = m_sphere_centers.size() - 1;
         }
 
         m_node_array[id] = Node(id, prim_id, type);
@@ -65,8 +70,9 @@ csg::CSGTree::CSGTree(const std::string &path) {
 
     m_node_array[0] = Node(-1, -1, Node::Guard);
 
-    m_radiuses.shrink_to_fit();
-    m_centers.shrink_to_fit();
+    m_sphere_radiuses.shrink_to_fit();
+    m_sphere_colors.shrink_to_fit();
+    m_sphere_centers.shrink_to_fit();
     m_node_array.shrink_to_fit();
 }
 

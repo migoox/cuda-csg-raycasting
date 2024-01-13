@@ -40,18 +40,17 @@ namespace cpu_raytracer {
         return -1.f;
     }
 
-    uint32_t on_hit(vec3 hit_point, vec3 normal) {
+    uint32_t on_hit(vec3 hit_point, vec3 normal, vec3 color) {
         vec3 light_pos = vec3(0.f, 1.f, 0.f);
-
 
         // normal = 0.5f * (normal + 1.f);
         // return get_color_rgb_norm(normal.r, normal.g, normal.b);
 
         vec3 light_dir = normalize(light_pos - hit_point);
 
-        vec3 color = vec3(1.f, 0.f, 0.f) * glm::clamp(glm::dot(normal, light_dir), 0.f, 1.f);
+        vec3 res_color = color * glm::clamp(glm::dot(normal, light_dir), 0.f, 1.f);
 
-        return renderer::get_color_rgb_norm(color.r, color.g, color.b);
+        return renderer::get_color_rgb_norm(res_color.r, res_color.g, res_color.b);
     }
 
     uint32_t on_miss() {
@@ -153,6 +152,7 @@ namespace cpu_raytracer {
     struct IntersectionResult {
         float t; // if t == -1.0f => miss
         vec3 normal;
+        int leaf_id; // -1 => miss
     };
 
     IntersectionResult csg_intersect(const csg::CSGTree& tree, const vec3& origin, const vec3& dir, csg::Node node, float min) {
@@ -161,7 +161,8 @@ namespace cpu_raytracer {
             float t = get_sphere_hit(tree.sphere_center(node.prim_id), tree.sphere_radius(node.prim_id), origin, dir, min);
             return IntersectionResult {
                     t,
-                    t == -1.f ? vec3(0.f) : normalize(origin + t * dir - tree.sphere_center(node.prim_id))
+                    t == -1.f ? vec3(0.f) : normalize(origin + t * dir - tree.sphere_center(node.prim_id)),
+                    node.id
             };
         }
 
@@ -177,7 +178,7 @@ namespace cpu_raytracer {
         while (true) {
             CSGActions actions = CSGActions(state_l, state_r, node);
             if (actions.has_action(CSGActions::Miss)) {
-                return IntersectionResult { -1.f, vec3(0.f) }; // Miss
+                return IntersectionResult { -1.f, vec3(0.f), -1 }; // Miss
             }
 
             if (actions.has_action(CSGActions::RetLeft) ||
@@ -188,7 +189,7 @@ namespace cpu_raytracer {
             if (actions.has_action(CSGActions::RetRight) ||
                 (actions.has_action(CSGActions::RetRightIfCloser) && res_r.t <= res_l.t)) {
                 if (actions.has_action(CSGActions::FlipRight)) {
-                    return IntersectionResult { res_r.t, -res_r.normal };
+                    return IntersectionResult { res_r.t, -res_r.normal, res_r.leaf_id };
                 }
                 return res_r;
             }
@@ -204,7 +205,7 @@ namespace cpu_raytracer {
                 res_r = csg_intersect(tree, origin, dir, tree.get_node(node.get_right_id()), min_r);
                 state_r = csg_point_classify(res_r.t, res_r.normal, dir);
             } else {
-                return IntersectionResult { -1.f, vec3(0.f) }; // Miss
+                return IntersectionResult { -1.f, vec3(0.f), -1 }; // Miss
             }
         }
     }
@@ -216,11 +217,11 @@ namespace cpu_raytracer {
 
         auto result = csg_intersect(tree, origin, dir, tree.get_node(1), 0.f);
 
-        if (result.t == -1.0f) {
+        if (result.leaf_id == -1) {
             return on_miss();
         }
 
-        return on_hit(origin + dir * result.t, result.normal);
+        return on_hit(origin + dir * result.t, result.normal, tree.sphere_color(tree.get_node(result.leaf_id).prim_id));
     }
 
     uint32_t trace_ray(const csg::CSGTree& tree, const vec3& origin, const vec3& dir) {
@@ -237,7 +238,7 @@ namespace cpu_raytracer {
 
         if (closest_sphere != -1) {
             vec3 closest_hit = origin + dir * t_min;
-            return on_hit(closest_hit, normalize(closest_hit - tree.sphere_center(closest_sphere)));
+            return on_hit(closest_hit, normalize(closest_hit - tree.sphere_center(closest_sphere)), tree.sphere_color(closest_sphere));
         }
 
         return on_miss();
@@ -257,6 +258,4 @@ namespace cpu_raytracer {
             return trace_ray(tree, eye, dir);
         }
     }
-
-
 }

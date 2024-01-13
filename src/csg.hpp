@@ -38,12 +38,14 @@ namespace csg {
         Node get_node(int id) const;
         size_t get_nodes_count() const { return m_node_array.size(); }
 
-        float sphere_radius(int prim_id) const { return m_radiuses[prim_id]; }
-        const glm::vec3& sphere_center(int prim_id) const { return m_centers[prim_id]; }
+        float sphere_radius(int prim_id) const { return m_sphere_radiuses[prim_id]; }
+        const glm::vec3& sphere_center(int prim_id) const { return m_sphere_centers[prim_id]; }
+        const glm::vec3& sphere_color(int prim_id) const { return m_sphere_colors[prim_id]; }
 
-        const std::vector<float>& sphere_radiuses() const { return m_radiuses; }
-        const std::vector<glm::vec3>& sphere_centers() const { return m_centers; }
-        size_t get_sphere_count() const { return m_radiuses.size(); }
+        const std::vector<float>& sphere_radiuses() const { return m_sphere_radiuses; }
+        const std::vector<glm::vec3>& sphere_centers() const { return m_sphere_centers; }
+        const std::vector<glm::vec3>& sphere_colors() const { return m_sphere_colors; }
+        size_t get_sphere_count() const { return m_sphere_radiuses.size(); }
 
     private:
         static Node::Type str_to_type(const std::string& str);
@@ -52,8 +54,9 @@ namespace csg {
         std::vector<Node> m_node_array;
 
         // Spheres
-        std::vector<float> m_radiuses;
-        std::vector<glm::vec3> m_centers;
+        std::vector<float> m_sphere_radiuses;
+        std::vector<glm::vec3> m_sphere_centers;
+        std::vector<glm::vec3> m_sphere_colors;
     };
 
 }

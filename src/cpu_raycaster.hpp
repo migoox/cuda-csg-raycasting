@@ -10,7 +10,8 @@ namespace cpu_raytracer {
 
     uint32_t trace_ray(glm::vec3 origin, glm::vec3 dir);
 
-    uint32_t per_pixel(int x, int y, glm::vec2 canvas, glm::vec3 eye,  glm::mat4 inv_proj,  glm::mat4 inv_view, const csg::CSGTree& tree, bool csg = false);
+    uint32_t per_pixel(int x, int y, glm::vec2 canvas, glm::vec3 eye,  glm::mat4 inv_proj,  glm::mat4 inv_view,
+                       const csg::CSGTree& tree, bool csg = false);
 }
 
 
