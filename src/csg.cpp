@@ -88,3 +88,71 @@ csg::Node::Type csg::CSGTree::str_to_type(const std::string &str) {
     }
     return Node::None;
 }
+
+csg::CSGActions::CSGActions(csg::PointState state_l, csg::PointState state_r, const csg::Node &node) {
+    static CSGAction union_table[][3] = {
+            {RetLeftIfCloser, RetRightIfCloser, None},     {RetRightIfCloser, LoopLeft, None},          {RetLeft, None, None},
+            {RetLeftIfCloser, LoopRight, None},            {LoopLeftIfCloser, LoopRightIfCloser, None}, {RetLeft, None, None},
+            {RetRight, None, None},                        {RetRight, None, None},                      {Miss, None, None},
+    };
+
+    static CSGAction inter_table[][3] = {
+            {LoopLeftIfCloser, LoopRightIfCloser, None},   {RetLeftIfCloser, LoopRight, None},          {Miss, None, None},
+            {RetRightIfCloser, LoopLeft, None},            {RetLeftIfCloser, RetRightIfCloser, None},   {Miss, None, None},
+            {Miss, None, None},                            {Miss, None, None},                          {Miss, None, None},
+    };
+
+    static CSGAction diff_table[][3] = {
+            {RetLeftIfCloser, LoopRight, None},            {LoopLeftIfCloser, LoopRightIfCloser, None}, {RetLeft, None, None},
+            {RetLeftIfCloser, RetRightIfCloser, FlipRight},{RetRightIfCloser, FlipRight, LoopLeft},     {RetLeft, None, None},
+            {Miss, None, None},                            {Miss, None, None},                          {Miss, None, None},
+    };
+
+    if (node.type == csg::Node::Type::UnionOp) {
+        array[0] = union_table[(int)state_l * 3 + (int)state_r][0];
+        array[1] = union_table[(int)state_l * 3 + (int)state_r][1];
+        array[2] = union_table[(int)state_l * 3 + (int)state_r][2];
+
+    } else if (node.type == csg::Node::Type::DiffOp) {
+        array[0] = diff_table[(int)state_l * 3 + (int)state_r][0];
+        array[1] = diff_table[(int)state_l * 3 + (int)state_r][1];
+        array[2] = diff_table[(int)state_l * 3 + (int)state_r][2];
+    } else if (node.type == csg::Node::Type::InterOp) {
+        array[0] = inter_table[(int)state_l * 3 + (int)state_r][0];
+        array[1] = inter_table[(int)state_l * 3 + (int)state_r][1];
+        array[2] = inter_table[(int)state_l * 3 + (int)state_r][2];
+    }
+}
+
+bool csg::CSGActions::has_action(csg::CSGActions::CSGAction action) const {
+    if (array[0] == action) {
+        return true;
+    }
+
+    if (array[1] == action) {
+        return true;
+    }
+
+    if (array[2] == action) {
+        return true;
+    }
+
+    return false;
+}
+
+csg::PointState csg::csg_point_classify(float t, glm::vec3 normal, glm::vec3 ray_dir) {
+        if (t == 0.f) {
+            return PointState::Miss;
+        }
+
+        if (dot(normal, ray_dir) > 0.f) {
+            return PointState::Exit;
+        }
+
+        if (dot(normal, ray_dir) < 0.f) {
+            return PointState::Enter;
+        }
+
+        return PointState::Miss;
+    }
+

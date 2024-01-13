@@ -59,6 +59,41 @@ namespace csg {
         std::vector<glm::vec3> m_sphere_colors;
     };
 
+    enum class PointState {
+        Enter,
+        Exit,
+        Miss
+    };
+
+    PointState csg_point_classify(float t, glm::vec3 normal, glm::vec3 ray_dir);
+
+    struct CSGActions {
+        enum CSGAction {
+            RetLeftIfCloser,
+            RetRightIfCloser,
+            LoopRight,
+            LoopLeft,
+            RetLeft,
+            RetRight,
+            LoopLeftIfCloser,
+            LoopRightIfCloser,
+            FlipRight,
+            Miss,
+            None
+        };
+
+        bool has_action(CSGAction action) const;
+
+        CSGActions(PointState state_l, PointState state_r, const csg::Node& node);
+
+        CSGAction array[3] = {None, None, None };
+    };
+
+    struct IntersectionResult {
+        float t; // if t == -1.0f => miss
+        glm::vec3 normal;
+        int leaf_id; // -1 => miss
+    };
 }
 
 #endif //CUDA_CSG_RAYCASTING_CSG_TREE_H

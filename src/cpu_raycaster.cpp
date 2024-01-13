@@ -8,6 +8,7 @@
 
 namespace cpu_raytracer {
     using namespace glm;
+    using namespace csg;
 
     // Returns parametric function argument (t), returns -1.f in the case there was no hit
     float get_sphere_hit(vec3 center, float radius, vec3 ray_origin, vec3 ray_dir, float min) {
@@ -58,104 +59,7 @@ namespace cpu_raytracer {
         return renderer::get_color_rgb(60, 60, 60);
     }
 
-    enum class PointState {
-        Enter,
-        Exit,
-        Miss
-    };
-
-    struct CSGActions {
-        enum CSGAction {
-            RetLeftIfCloser,
-            RetRightIfCloser,
-            LoopRight,
-            LoopLeft,
-            RetLeft,
-            RetRight,
-            LoopLeftIfCloser,
-            LoopRightIfCloser,
-            FlipRight,
-            Miss,
-            None
-        };
-
-        bool has_action(CSGAction action) {
-            if (array[0] == action) {
-                return true;
-            }
-
-            if (array[1] == action) {
-                return true;
-            }
-
-            if (array[2] == action) {
-                return true;
-            }
-
-            return false;
-        }
-
-        CSGActions(PointState state_l, PointState state_r, const csg::Node& node) {
-            static CSGAction union_table[][3] = {
-                    {RetLeftIfCloser, RetRightIfCloser, None},     {RetRightIfCloser, LoopLeft, None},          {RetLeft, None, None},
-                    {RetLeftIfCloser, LoopRight, None},            {LoopLeftIfCloser, LoopRightIfCloser, None}, {RetLeft, None, None},
-                    {RetRight, None, None},                        {RetRight, None, None},                      {Miss, None, None},
-            };
-
-            static CSGAction inter_table[][3] = {
-                    {LoopLeftIfCloser, LoopRightIfCloser, None},   {RetLeftIfCloser, LoopRight, None},          {Miss, None, None},
-                    {RetRightIfCloser, LoopLeft, None},            {RetLeftIfCloser, RetRightIfCloser, None},   {Miss, None, None},
-                    {Miss, None, None},                            {Miss, None, None},                          {Miss, None, None},
-            };
-
-            static CSGAction diff_table[][3] = {
-                    {RetLeftIfCloser, LoopRight, None},            {LoopLeftIfCloser, LoopRightIfCloser, None}, {RetLeft, None, None},
-                    {RetLeftIfCloser, RetRightIfCloser, FlipRight},{RetRightIfCloser, FlipRight, LoopLeft},     {RetLeft, None, None},
-                    {Miss, None, None},                            {Miss, None, None},                          {Miss, None, None},
-            };
-
-            if (node.type == csg::Node::Type::UnionOp) {
-                array[0] = union_table[(int)state_l * 3 + (int)state_r][0];
-                array[1] = union_table[(int)state_l * 3 + (int)state_r][1];
-                array[2] = union_table[(int)state_l * 3 + (int)state_r][2];
-
-            } else if (node.type == csg::Node::Type::DiffOp) {
-                array[0] = diff_table[(int)state_l * 3 + (int)state_r][0];
-                array[1] = diff_table[(int)state_l * 3 + (int)state_r][1];
-                array[2] = diff_table[(int)state_l * 3 + (int)state_r][2];
-            } else if (node.type == csg::Node::Type::InterOp) {
-                array[0] = inter_table[(int)state_l * 3 + (int)state_r][0];
-                array[1] = inter_table[(int)state_l * 3 + (int)state_r][1];
-                array[2] = inter_table[(int)state_l * 3 + (int)state_r][2];
-            }
-        }
-
-        CSGAction array[3] = {None, None, None };
-    };
-
-    PointState csg_point_classify(float t, vec3 normal, vec3 ray_dir) {
-        if (t == 0.f) {
-            return PointState::Miss;
-        }
-
-        if (dot(normal, ray_dir) > 0.f) {
-            return PointState::Exit;
-        }
-
-        if (dot(normal, ray_dir) < 0.f) {
-            return PointState::Enter;
-        }
-
-        return PointState::Miss;
-    }
-
-    struct IntersectionResult {
-        float t; // if t == -1.0f => miss
-        vec3 normal;
-        int leaf_id; // -1 => miss
-    };
-
-    IntersectionResult csg_intersect(const csg::CSGTree& tree, const vec3& origin, const vec3& dir, csg::Node node, float min) {
+    csg::IntersectionResult csg_intersect(const csg::CSGTree& tree, const vec3& origin, const vec3& dir, csg::Node node, float min) {
         // Stop condition
         if (node.type == csg::Node::Type::Sphere) {
             float t = get_sphere_hit(tree.sphere_center(node.prim_id), tree.sphere_radius(node.prim_id), origin, dir, min);
