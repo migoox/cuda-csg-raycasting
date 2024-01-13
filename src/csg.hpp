@@ -35,7 +35,8 @@ namespace csg {
     public:
         explicit CSGTree(const std::string& path);
 
-        Node get_node(int id);
+        Node get_node(int id) const;
+        size_t get_nodes_count() const { return m_node_array.size(); }
 
         float sphere_radius(int prim_id) const { return m_radiuses[prim_id]; }
         const glm::vec3& sphere_center(int prim_id) const { return m_centers[prim_id]; }

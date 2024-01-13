@@ -7,7 +7,7 @@ csg::Node::Node(int id, int prim_id, csg::Node::Type type)
  : id(id), prim_id(prim_id), type(type) { }
 
 int csg::Node::get_left_id() const {
-    return id / 2;
+    return 2 * id;
 }
 
 int csg::Node::get_right_id() const {
@@ -15,7 +15,7 @@ int csg::Node::get_right_id() const {
 }
 
 int csg::Node::get_parent_id() const {
-    return 2 * id;
+    return id / 2;
 }
 
 csg::Node &csg::Node::operator=(const csg::Node &other) {
@@ -30,7 +30,7 @@ csg::Node &csg::Node::operator=(const csg::Node &other) {
 csg::Node::Node(const csg::Node &other)
 : id(other.id), prim_id(other.prim_id), type(other.type) { }
 
-csg::Node csg::CSGTree::get_node(int id) {
+csg::Node csg::CSGTree::get_node(int id) const {
     if (id > m_node_array.size()) {
         return csg::Node(-1, -1, csg::Node::None);
     }
@@ -57,7 +57,7 @@ csg::CSGTree::CSGTree(const std::string &path) {
         if (obj["type"] == "sphere") {
             m_radiuses.push_back(obj["radius"]);
             m_centers.emplace_back(obj["center"]["x"], obj["center"]["y"], obj["center"]["z"]);
-            prim_id = m_centers.size();
+            prim_id = m_centers.size() - 1;
         }
 
         m_node_array[id] = Node(id, prim_id, type);

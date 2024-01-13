@@ -25,7 +25,7 @@ using namespace renderer;
 const int INIT_SCREEN_SIZE_X = 800;
 const int INIT_SCREEN_SIZE_Y = 600;
 
-void update_canvas(Image& canvas, app::CameraOperator& cam_operator, const csg::CSGTree& tree) {
+void update_canvas(Image& canvas, app::CameraOperator& cam_operator, const csg::CSGTree& tree, bool show_csg) {
     for (int y = 0; y < canvas.get_height(); y++) {
         for (int x = 0; x < canvas.get_width(); x++) {
             canvas.set_pixel(x, y, cpu_raytracer::per_pixel(x, y,
@@ -33,7 +33,8 @@ void update_canvas(Image& canvas, app::CameraOperator& cam_operator, const csg::
                                                             cam_operator.get_cam().get_pos(),
                                                             cam_operator.get_cam().get_inv_proj(),
                                                             cam_operator.get_cam().get_inv_view(),
-                                                            tree));
+                                                            tree,
+                                                            show_csg));
         }
     }
 }
@@ -54,7 +55,7 @@ int main(int, char**) {
         ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
         std::string executable_dir = std::filesystem::path(__FILE__).parent_path().string();
-        csg::CSGTree tree = csg::CSGTree(executable_dir + "/../res/simple_tree.json");
+        csg::CSGTree tree = csg::CSGTree(executable_dir + "/../res/test.json");
         ShaderProgram sh(executable_dir + "/../res/billboard.vert", executable_dir + "/../res/billboard.frag");
         sh.bind();
         sh.set_uniform_1i("u_texture", 0);
@@ -69,7 +70,8 @@ int main(int, char**) {
         std::chrono::steady_clock::time_point current_time = std::chrono::steady_clock::now();
         std::chrono::steady_clock::time_point previous_time = current_time;
 
-        update_canvas(canvas, cam_operator, tree);
+        bool show_csg = false;
+        update_canvas(canvas, cam_operator, tree, show_csg);
         txt_res->update(canvas);
 
         // Main loop
@@ -83,6 +85,10 @@ int main(int, char**) {
             {
                 ImGui::Begin("Controls");
                 ImGui::Button("Load Scene");
+                if (ImGui::Checkbox("CSG on", &show_csg)) {
+                    update_canvas(canvas, cam_operator, tree, show_csg);
+                    txt_res->update(canvas);
+                }
                 ImGui::End();
             }
 
@@ -94,7 +100,7 @@ int main(int, char**) {
             previous_time = current_time;
 
             if (cam_operator.update(window, delta_time.count())) {
-                update_canvas(canvas, cam_operator, tree);
+                update_canvas(canvas, cam_operator, tree, show_csg);
                 txt_res->update(canvas);
             }
 

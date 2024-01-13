@@ -1,0 +1,23 @@
+{
+    "scene": {
+        "max_id": 3,
+        "objects": [
+            {
+                "id": 1,
+                "type": "diff"
+            },
+            {
+                "id": 2,
+                "type": "sphere",
+                "radius": 1.0,
+                "center": { "x": 0.0, "y": 0.0, "z": -7.0 }
+            },
+            {
+                "id": 3,
+                "type": "sphere",
+                "radius": 1.0,
+                "center": { "x": 0.0, "y": 0.0, "z": -6.0 }
+            }
+        ]
+    }
+}
