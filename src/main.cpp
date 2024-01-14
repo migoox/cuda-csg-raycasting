@@ -53,7 +53,7 @@ int main(int, char**) {
 
         // Init GLEW and ImGui
         Backend::init_glew();
-        Backend::init_imgui(window);
+        auto imgui_io = Backend::init_imgui(window);
 
         // Application state
         ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
@@ -73,6 +73,7 @@ int main(int, char**) {
 
         std::chrono::steady_clock::time_point current_time = std::chrono::steady_clock::now();
         std::chrono::steady_clock::time_point previous_time = current_time;
+        std::chrono::duration<float> delta_time = std::chrono::duration_cast<std::chrono::duration<float>>(current_time - previous_time);
 
         bool show_csg = true;
 //        update_canvas(canvas, cam_operator, tree, show_csg);
@@ -99,7 +100,15 @@ int main(int, char**) {
             ImGui_ImplGlfw_NewFrame();
             ImGui::NewFrame();
             {
+
                 ImGui::Begin("Controls");
+
+                // Display floating text
+                ImGui::SetNextWindowPos(ImVec2(0, 0)); // Set position for the text
+                ImGui::Begin("Floating Text", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings);
+                ImGui::Text("%.1f FPS", 1.f / delta_time.count());
+                ImGui::End();
+
                 ImGui::Button("Load Scene");
                 if (ImGui::Checkbox("CSG on", &show_csg)) {
 //                    update_canvas(canvas, cam_operator, tree, show_csg);
@@ -122,7 +131,7 @@ int main(int, char**) {
 
             // Calculate delta time
             current_time = std::chrono::steady_clock::now();
-            std::chrono::duration<float> delta_time = std::chrono::duration_cast<std::chrono::duration<float>>(current_time - previous_time);
+            delta_time = std::chrono::duration_cast<std::chrono::duration<float>>(current_time - previous_time);
             previous_time = current_time;
 
             if (cam_operator.update(window, delta_time.count())) {

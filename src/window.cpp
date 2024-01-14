@@ -56,7 +56,7 @@ void Backend::init_glew() {
     std::cout << "[GLEW] Using GL Version: " << glGetString(GL_VERSION) << std::endl;
 }
 
-void Backend::init_imgui(Window &window) {
+ImGuiIO& Backend::init_imgui(Window &window) {
     // Setup Dear ImGui context
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
@@ -70,6 +70,7 @@ void Backend::init_imgui(Window &window) {
     // Setup Platform/Renderer backends
     ImGui_ImplGlfw_InitForOpenGL(window.get_raw(), true);
     ImGui_ImplOpenGL3_Init(glsl_version.c_str());
+    return io;
 }
 
 

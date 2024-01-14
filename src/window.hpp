@@ -4,6 +4,7 @@
 #include <string>
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
+#include "imgui.h"
 
 namespace renderer {
     struct Vec2i {
@@ -23,7 +24,7 @@ namespace renderer {
 
     class Backend {
     public:
-        static void init_imgui(Window& window);
+        static ImGuiIO& init_imgui(Window& window);
         static void terminate_imgui();
 
         static void init_glfw();

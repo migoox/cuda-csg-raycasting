@@ -21,6 +21,7 @@ namespace csg {
         int prim_id; // id of a primitive ( e.g. sphere ), it's -1 if the node is not representing a primitive
         Type type;   // node type ( if None => the node is invalid)
 
+        __host__ __device__ Node() = default;
         __host__ __device__ Node(int id, int prim_id, Type type);
         __host__ __device__ int get_parent_id() const;
         __host__ __device__ int get_left_id() const;

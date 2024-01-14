@@ -2,6 +2,7 @@
 #include <device_launch_parameters.h>
 #include <iostream>
 #include "cuda_raycaster.cuh"
+#include <cuda_runtime.h>
 
 __device__ uint32_t get_color_rgb_norm(float r, float g, float b) {
     return static_cast<uint32_t>(std::round(r * 255.f)) << 24 |
@@ -260,6 +261,27 @@ __global__ void csg_trace_ray(
 ) {
     uint32_t k = blockIdx.x * blockDim.x + threadIdx.x;
     int count = width * height;
+    if (k >= count) {
+        return;
+    }
+
+    // Assuming that there is max 512 leafs and max 512 centers
+    __shared__ float sm_radiuses[512];
+    __shared__ glm::vec3 sm_centers[512];
+    __shared__ csg::Node sm_nodes[512];
+
+    // Assuming that there are exactly 1024 threads in one block
+    if (threadIdx.x < prim_count) {
+        sm_radiuses[threadIdx.x] = radiuses[threadIdx.x];
+        sm_centers[threadIdx.x] = centers[threadIdx.x];
+    }
+
+    if (threadIdx.x < nodes_count) {
+        sm_nodes[threadIdx.x] = nodes[threadIdx.x];
+    }
+
+    // Sync the threads within the block
+    __syncthreads();
 
     if (k >= count) {
         return;
@@ -269,7 +291,7 @@ __global__ void csg_trace_ray(
         canvas[k] = on_miss();
     }
 
-    auto result = csg_intersect(nodes, prim_count, nodes_count, radiuses, centers, colors, origins[k], dirs[k], nodes[1], 0.f);
+    auto result = csg_intersect(sm_nodes, prim_count, nodes_count, sm_radiuses, sm_centers, colors, origins[k], dirs[k], nodes[1], 0.f);
 
     if (result.leaf_id == -1) {
         canvas[k] = on_miss();
