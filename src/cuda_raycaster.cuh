@@ -1,6 +1,6 @@
 #ifndef CUDA_CSG_RAYCASTING_CUDA_RAYCASTER_CUH
 #define CUDA_CSG_RAYCASTING_CUDA_RAYCASTER_CUH
-#include "csg.hpp"
+#include "csg_utils.cuh"
 #include "textures.hpp"
 
 namespace cuda_raycaster {

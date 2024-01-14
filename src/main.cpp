@@ -14,7 +14,7 @@
 #include "vendor/imgui/backend/imgui_impl_opengl3.h"
 #include "billboard.hpp"
 
-#include "csg.hpp"
+#include "csg_utils.cuh"
 
 #include "cpu_raycaster.hpp"
 
@@ -74,7 +74,7 @@ int main(int, char**) {
         std::chrono::steady_clock::time_point current_time = std::chrono::steady_clock::now();
         std::chrono::steady_clock::time_point previous_time = current_time;
 
-        bool show_csg = false;
+        bool show_csg = true;
 //        update_canvas(canvas, cam_operator, tree, show_csg);
 //        txt_res->update(canvas);
 
@@ -104,6 +104,16 @@ int main(int, char**) {
                 if (ImGui::Checkbox("CSG on", &show_csg)) {
 //                    update_canvas(canvas, cam_operator, tree, show_csg);
 //                    txt_res->update(canvas);
+
+                gpu_rc.update_canvas(canvas, cuda_raycaster::GPURayCaster::Input {
+                        cam_operator.get_cam().get_inv_proj(),
+                        cam_operator.get_cam().get_inv_view(),
+                        cam_operator.get_cam().get_pos(),
+                        glm::vec2(INIT_SCREEN_SIZE_X, INIT_SCREEN_SIZE_Y),
+                        tree,
+                        show_csg,
+                });
+                txt_res->update(canvas);
                 }
                 ImGui::End();
             }

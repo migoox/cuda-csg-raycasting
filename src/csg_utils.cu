@@ -1,34 +1,22 @@
-#include "csg.hpp"
+#include "csg_utils.cuh"
 #include <fstream>
 #include <cmath>
 #include "vendor/nlohmann/json.hpp"
 
-csg::Node::Node(int id, int prim_id, csg::Node::Type type)
+__host__ __device__ csg::Node::Node(int id, int prim_id, csg::Node::Type type)
  : id(id), prim_id(prim_id), type(type) { }
 
-int csg::Node::get_left_id() const {
+__host__ __device__ int csg::Node::get_left_id() const {
     return 2 * id;
 }
 
-int csg::Node::get_right_id() const {
+__host__ __device__ int csg::Node::get_right_id() const {
     return 2 * id + 1;
 }
 
-int csg::Node::get_parent_id() const {
+__host__ __device__ int csg::Node::get_parent_id() const {
     return id / 2;
 }
-
-csg::Node &csg::Node::operator=(const csg::Node &other) {
-    if (this != &other) {
-        const_cast<int&>(id) = other.id;
-        const_cast<int&>(prim_id) = other.prim_id;
-        const_cast<Type&>(type) = other.type;
-    }
-    return *this;
-}
-
-csg::Node::Node(const csg::Node &other)
-: id(other.id), prim_id(other.prim_id), type(other.type) { }
 
 csg::Node csg::CSGTree::get_node(int id) const {
     if (id > m_node_array.size()) {
@@ -89,7 +77,7 @@ csg::Node::Type csg::CSGTree::str_to_type(const std::string &str) {
     return Node::None;
 }
 
-csg::CSGActions::CSGActions(csg::PointState state_l, csg::PointState state_r, const csg::Node &node) {
+__host__ __device__ csg::CSGActions::CSGActions(csg::PointState state_l, csg::PointState state_r, const csg::Node &node) {
     static CSGAction union_table[][3] = {
             {RetLeftIfCloser, RetRightIfCloser, None},     {RetRightIfCloser, LoopLeft, None},          {RetLeft, None, None},
             {RetLeftIfCloser, LoopRight, None},            {LoopLeftIfCloser, LoopRightIfCloser, None}, {RetLeft, None, None},
@@ -124,7 +112,7 @@ csg::CSGActions::CSGActions(csg::PointState state_l, csg::PointState state_r, co
     }
 }
 
-bool csg::CSGActions::has_action(csg::CSGActions::CSGAction action) const {
+__host__ __device__ bool csg::CSGActions::has_action(csg::CSGActions::CSGAction action) const {
     if (array[0] == action) {
         return true;
     }
@@ -139,20 +127,3 @@ bool csg::CSGActions::has_action(csg::CSGActions::CSGAction action) const {
 
     return false;
 }
-
-csg::PointState csg::csg_point_classify(float t, glm::vec3 normal, glm::vec3 ray_dir) {
-        if (t == 0.f) {
-            return PointState::Miss;
-        }
-
-        if (dot(normal, ray_dir) > 0.f) {
-            return PointState::Exit;
-        }
-
-        if (dot(normal, ray_dir) < 0.f) {
-            return PointState::Enter;
-        }
-
-        return PointState::Miss;
-    }
-

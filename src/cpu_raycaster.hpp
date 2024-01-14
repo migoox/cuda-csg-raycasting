@@ -1,7 +1,7 @@
 #ifndef CSG_RAY_TRACING_CUDA_RAYTRACER_CUH
 #define CSG_RAY_TRACING_CUDA_RAYTRACER_CUH
 #include <cstdint>
-#include "csg.hpp"
+#include "csg_utils.cuh"
 
 namespace cpu_raytracer {
 

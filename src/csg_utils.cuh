@@ -3,10 +3,11 @@
 #include <vector>
 #include <glm/glm.hpp>
 #include <string>
+#include <cuda_runtime.h>
 
 namespace csg {
     struct Node {
-        enum Type {
+        enum Type : int {
             None,
             Guard,
             Sphere,
@@ -16,19 +17,14 @@ namespace csg {
             InterOp
         };
 
-        const int id;      // id in the array that represents a tree
-        const int prim_id; // id of a primitive ( e.g. sphere ), it's -1 if the node is not representing a primitive
-        const Type type;   // node type ( if None => the node is invalid)
+        int id;      // id in the array that represents a tree
+        int prim_id; // id of a primitive ( e.g. sphere ), it's -1 if the node is not representing a primitive
+        Type type;   // node type ( if None => the node is invalid)
 
-        Node(int id, int prim_id, Type type);
-
-        // Copy assignment operator
-        Node(const Node& other);
-        Node& operator=(const Node& other);
-
-        int get_parent_id() const;
-        int get_left_id() const;
-        int get_right_id() const;
+        __host__ __device__ Node(int id, int prim_id, Type type);
+        __host__ __device__ int get_parent_id() const;
+        __host__ __device__ int get_left_id() const;
+        __host__ __device__ int get_right_id() const;
     };
 
     class CSGTree {
@@ -60,13 +56,11 @@ namespace csg {
         std::vector<glm::vec3> m_sphere_colors;
     };
 
-    enum class PointState {
+    enum class PointState : int {
         Enter,
         Exit,
         Miss
     };
-
-    PointState csg_point_classify(float t, glm::vec3 normal, glm::vec3 ray_dir);
 
     struct CSGActions {
         enum CSGAction {
@@ -83,9 +77,9 @@ namespace csg {
             None
         };
 
-        bool has_action(CSGAction action) const;
+        __host__ __device__ bool has_action(CSGAction action) const;
 
-        CSGActions(PointState state_l, PointState state_r, const csg::Node& node);
+        __host__ __device__ CSGActions(PointState state_l, PointState state_r, const csg::Node& node);
 
         CSGAction array[3] = {None, None, None };
     };

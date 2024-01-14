@@ -126,6 +126,7 @@ cuda_raycaster::GPURayCaster::GPURayCaster(const csg::CSGTree& tree, int width, 
     m_nodes_count = tree.get_nodes_count();
 }
 
+
 cuda_raycaster::GPURayCaster::~GPURayCaster() {
     cudaFree(m_dev_origins);
     cudaFree(m_dev_dirs);
@@ -159,6 +160,121 @@ __global__ void find_dirs(
         glm::vec4 target = inv_proj * glm::vec4(viewport_coords.x, viewport_coords.y, -1.f, 1.f);
         dirs[k] = glm::vec3(inv_view * glm::vec4(normalize(glm::vec3(target) / target.w), 0.f)); // world space
         origins[k] = eye;
+    }
+}
+
+__device__ csg::PointState csg_point_classify(float t, glm::vec3 normal, glm::vec3 ray_dir) {
+    if (t == 0.f) {
+        return csg::PointState::Miss;
+    }
+
+    if (dot(normal, ray_dir) > 0.f) {
+        return csg::PointState::Exit;
+    }
+
+    if (dot(normal, ray_dir) < 0.f) {
+        return csg::PointState::Enter;
+    }
+
+    return csg::PointState::Miss;
+}
+
+__device__ csg::IntersectionResult csg_intersect(
+        csg::Node *nodes,
+        int prim_count,
+        int nodes_count,
+        float *radiuses,
+        glm::vec3 *centers,
+        glm::vec3 *colors,
+        glm::vec3 origin,
+        glm::vec3 dir,
+        csg::Node node,
+        float min
+) {
+    // Stop condition
+    if (node.type == csg::Node::Type::Sphere) {
+        float t = get_sphere_hit(centers[node.prim_id], radiuses[node.prim_id], origin, dir, min);
+        return csg::IntersectionResult {
+                t,
+                t == -1.f ? glm::vec3(0.f) : normalize(origin + t * dir - centers[node.prim_id]),
+                node.id
+        };
+    }
+
+    float min_l = min;
+    float min_r = min;
+
+    // Recursive call
+    csg::IntersectionResult res_l = csg_intersect(nodes, prim_count, nodes_count, radiuses, centers, colors, origin, dir, nodes[node.get_left_id()], min_l);
+    csg::IntersectionResult res_r = csg_intersect(nodes, prim_count, nodes_count, radiuses, centers, colors, origin, dir, nodes[node.get_right_id()], min_r);
+
+    csg::PointState state_l = csg_point_classify(res_l.t, res_l.normal, dir);
+    csg::PointState state_r = csg_point_classify(res_r.t, res_r.normal, dir);
+    while (true) {
+        csg::CSGActions actions = csg::CSGActions(state_l, state_r, node);
+        if (actions.has_action(csg::CSGActions::Miss)) {
+            return csg::IntersectionResult { -1.f, glm::vec3(0.f), -1 }; // Miss
+        }
+
+        if (actions.has_action(csg::CSGActions::RetLeft) ||
+            (actions.has_action(csg::CSGActions::RetLeftIfCloser) && res_l.t <= res_r.t)) {
+            return res_l;
+        }
+
+        if (actions.has_action(csg::CSGActions::RetRight) ||
+            (actions.has_action(csg::CSGActions::RetRightIfCloser) && res_r.t <= res_l.t)) {
+            if (actions.has_action(csg::CSGActions::FlipRight)) {
+                return csg::IntersectionResult { res_r.t, -res_r.normal, res_r.leaf_id };
+            }
+            return res_r;
+        }
+
+        if (actions.has_action(csg::CSGActions::LoopLeft) ||
+            (actions.has_action(csg::CSGActions::LoopLeftIfCloser) && res_l.t <= res_r.t)) {
+            min_l = res_l.t;
+            res_l = csg_intersect(nodes, prim_count, nodes_count, radiuses, centers, colors, origin, dir, nodes[node.get_left_id()], min_l);
+            state_l = csg_point_classify(res_l.t, res_l.normal, dir);
+        } else if (actions.has_action(csg::CSGActions::LoopRight) ||
+                   (actions.has_action(csg::CSGActions::LoopRightIfCloser) && res_r.t <= res_l.t)) {
+            min_r = res_r.t;
+            res_r = csg_intersect(nodes, prim_count, nodes_count, radiuses, centers, colors, origin, dir, nodes[node.get_right_id()], min_r);
+            state_r = csg_point_classify(res_r.t, res_r.normal, dir);
+        } else {
+            return csg::IntersectionResult { -1.f, glm::vec3(0.f), -1 }; // Miss
+        }
+    }
+}
+
+__global__ void csg_trace_ray(
+        csg::Node *nodes,
+        float *radiuses,
+        glm::vec3 *centers,
+        glm::vec3 *colors,
+        int prim_count,
+        int nodes_count,
+        uint32_t *canvas,
+        int width,
+        int height,
+        glm::vec3 *origins,
+        glm::vec3 *dirs
+) {
+    uint32_t k = blockIdx.x * blockDim.x + threadIdx.x;
+    int count = width * height;
+
+    if (k >= count) {
+        return;
+    }
+
+    if (nodes_count <= 1) {
+        canvas[k] = on_miss();
+    }
+
+    auto result = csg_intersect(nodes, prim_count, nodes_count, radiuses, centers, colors, origins[k], dirs[k], nodes[1], 0.f);
+
+    if (result.leaf_id == -1) {
+        canvas[k] = on_miss();
+    } else {
+        canvas[k] = on_hit(origins[k] + dirs[k] * result.t, result.normal, colors[nodes[result.leaf_id].prim_id]);
     }
 }
 
@@ -218,17 +334,34 @@ void cuda_raycaster::GPURayCaster::update_canvas(renderer::Image &canvas,
     cudaDeviceSynchronize();
 
     // Second kernel: ray casting
-    trace_ray<<<blocks_num, threads_per_block>>>(
-            m_dev_radiuses,
-            m_dev_centers,
-            m_dev_colors,
-            m_spheres_count,
-            m_dev_origins,
-            m_dev_dirs,
-            m_dev_canvas,
-            m_width,
-            m_height
-    );
+    if (input.show_csg) {
+
+        csg_trace_ray<<<blocks_num, threads_per_block>>>(
+                m_dev_node_array,
+                m_dev_radiuses,
+                m_dev_centers,
+                m_dev_colors,
+                m_spheres_count,
+                m_nodes_count,
+                m_dev_canvas,
+                m_width,
+                m_height,
+                m_dev_origins,
+                m_dev_dirs
+        );
+    } else {
+        trace_ray<<<blocks_num, threads_per_block>>>(
+                m_dev_radiuses,
+                m_dev_centers,
+                m_dev_colors,
+                m_spheres_count,
+                m_dev_origins,
+                m_dev_dirs,
+                m_dev_canvas,
+                m_width,
+                m_height
+        );
+    }
     cudaDeviceSynchronize();
 
     cudaError_t cuda_status;

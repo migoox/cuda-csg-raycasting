@@ -56,6 +56,22 @@ namespace cpu_raytracer {
         return renderer::get_color_rgb(60, 60, 60);
     }
 
+    csg::PointState csg_point_classify(float t, glm::vec3 normal, glm::vec3 ray_dir) {
+        if (t == 0.f) {
+            return PointState::Miss;
+        }
+
+        if (dot(normal, ray_dir) > 0.f) {
+            return PointState::Exit;
+        }
+
+        if (dot(normal, ray_dir) < 0.f) {
+            return PointState::Enter;
+        }
+
+        return PointState::Miss;
+    }
+
     csg::IntersectionResult csg_intersect(const csg::CSGTree& tree, const vec3& origin, const vec3& dir, csg::Node node, float min) {
         // Stop condition
         if (node.type == csg::Node::Type::Sphere) {
