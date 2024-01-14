@@ -37,6 +37,7 @@ namespace csg {
 
         Node get_node(int id) const;
         size_t get_nodes_count() const { return m_node_array.size(); }
+        const std::vector<csg::Node>& nodes() const { return m_node_array; }
 
         float sphere_radius(int prim_id) const { return m_sphere_radiuses[prim_id]; }
         const glm::vec3& sphere_center(int prim_id) const { return m_sphere_centers[prim_id]; }

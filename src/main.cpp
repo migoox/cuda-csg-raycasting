@@ -1,3 +1,4 @@
+#define GLM_FORCE_CUDA
 #include <glm/glm.hpp>
 
 #include <GL/glew.h>
@@ -13,8 +14,11 @@
 #include "vendor/imgui/backend/imgui_impl_opengl3.h"
 #include "billboard.hpp"
 
-#include "cpu_raycaster.hpp"
 #include "csg.hpp"
+
+#include "cpu_raycaster.hpp"
+
+#include "cuda_raycaster.cuh"
 
 #if defined(_MSC_VER) && (_MSC_VER >= 1900) && !defined(IMGUI_DISABLE_WIN32_FUNCTIONS)
 #pragma comment(lib, "legacy_stdio_definitions")
@@ -71,7 +75,19 @@ int main(int, char**) {
         std::chrono::steady_clock::time_point previous_time = current_time;
 
         bool show_csg = false;
-        update_canvas(canvas, cam_operator, tree, show_csg);
+//        update_canvas(canvas, cam_operator, tree, show_csg);
+//        txt_res->update(canvas);
+
+        cuda_raycaster::GPURayCaster gpu_rc = cuda_raycaster::GPURayCaster(tree, INIT_SCREEN_SIZE_X, INIT_SCREEN_SIZE_Y);
+
+        gpu_rc.update_canvas(canvas, cuda_raycaster::GPURayCaster::Input {
+                cam_operator.get_cam().get_inv_proj(),
+                cam_operator.get_cam().get_inv_view(),
+                cam_operator.get_cam().get_pos(),
+                glm::vec2(INIT_SCREEN_SIZE_X, INIT_SCREEN_SIZE_Y),
+                tree,
+                show_csg,
+        });
         txt_res->update(canvas);
 
         // Main loop
@@ -86,8 +102,8 @@ int main(int, char**) {
                 ImGui::Begin("Controls");
                 ImGui::Button("Load Scene");
                 if (ImGui::Checkbox("CSG on", &show_csg)) {
-                    update_canvas(canvas, cam_operator, tree, show_csg);
-                    txt_res->update(canvas);
+//                    update_canvas(canvas, cam_operator, tree, show_csg);
+//                    txt_res->update(canvas);
                 }
                 ImGui::End();
             }
@@ -100,7 +116,17 @@ int main(int, char**) {
             previous_time = current_time;
 
             if (cam_operator.update(window, delta_time.count())) {
-                update_canvas(canvas, cam_operator, tree, show_csg);
+//                update_canvas(canvas, cam_operator, tree, show_csg);
+//                txt_res->update(canvas);
+
+                gpu_rc.update_canvas(canvas, cuda_raycaster::GPURayCaster::Input {
+                        cam_operator.get_cam().get_inv_proj(),
+                        cam_operator.get_cam().get_inv_view(),
+                        cam_operator.get_cam().get_pos(),
+                        glm::vec2(INIT_SCREEN_SIZE_X, INIT_SCREEN_SIZE_Y),
+                        tree,
+                        show_csg,
+                });
                 txt_res->update(canvas);
             }
 

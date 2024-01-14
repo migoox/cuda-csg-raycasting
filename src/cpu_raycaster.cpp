@@ -1,9 +1,6 @@
-#define GLM_FORCE_CUDA
 #include <glm/glm.hpp>
 #include "cpu_raycaster.hpp"
 #include "textures.hpp"
-#include "cuda_runtime.h"
-#include <cublas_v2.h>
 #include <limits>
 
 namespace cpu_raytracer {
