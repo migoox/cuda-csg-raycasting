@@ -1,10 +1,11 @@
 #include "csg_utils.cuh"
 #include <fstream>
 #include <cmath>
+#include <iostream>
 #include "vendor/nlohmann/json.hpp"
 
-__host__ __device__ csg::Node::Node(int id, int prim_id, csg::Node::Type type)
- : id(id), prim_id(prim_id), type(type) { }
+__host__ __device__ csg::Node::Node(int id, int context_id, csg::Node::Type type)
+ : id(id), context_id(context_id), type(type) { }
 
 __host__ __device__ int csg::Node::get_left_id() const {
     if (id == 0) {
@@ -21,12 +22,72 @@ __host__ __device__ int csg::Node::get_parent_id() const {
     return id / 2;
 }
 
+__host__ __device__ bool csg::Node::is_primitive() const {
+    if (type == csg::Node::UnionOp || type == csg::Node::DiffOp || type == csg::Node::InterOp) {
+        return false;
+    }
+    return true;
+}
+
+__host__ __device__ bool csg::Node::is_operation() const {
+    if (type == csg::Node::UnionOp || type == csg::Node::DiffOp || type == csg::Node::InterOp) {
+        return true;
+    }
+    return false;
+}
+
 csg::Node csg::CSGTree::get_node(int id) const {
     if (id > m_node_array.size()) {
         return csg::Node(-1, -1, csg::Node::None);
     }
     return m_node_array[id];
 }
+
+bool csg::CSGTree::check_correctness(csg::Node root) {
+    if (root.is_operation()) {
+        if (root.get_left_id() > m_node_array.size()
+            || m_node_array[root.get_left_id()].type == csg::Node::None
+            || root.get_right_id() > m_node_array.size()
+            || m_node_array[root.get_right_id()].type == csg::Node::None) {
+            return false;
+        } else {
+            return check_correctness(m_node_array[root.get_left_id()]) &&
+                   check_correctness(m_node_array[root.get_right_id()]);
+        }
+    } else {
+        if ((root.get_left_id() < m_node_array.size() && m_node_array[root.get_left_id()].type != csg::Node::None)
+            || (root.get_right_id() < m_node_array.size() && m_node_array[root.get_right_id()].type != csg::Node::None)) {
+            return false;
+        } else {
+            return true;
+        }
+    }
+}
+
+std::pair<glm::vec3, int> csg::CSGTree::find_leafs_sum(csg::Node root) {
+    if (root.is_primitive()) {
+        return std::pair<glm::vec3, int>(m_sphere_centers[root.context_id], 1);
+    }
+
+    auto lft = find_leafs_sum(m_node_array[root.get_left_id()]);
+    auto rght = find_leafs_sum(m_node_array[root.get_right_id()]);
+    return std::pair<glm::vec3, int>(lft.first + rght.first, lft.second + rght.second);
+}
+
+int csg::CSGTree::find_furthest_leaf(csg::Node root, const glm::vec3& from) {
+    if (root.is_primitive()) {
+        return root.context_id;
+    }
+
+    int lft = find_furthest_leaf(m_node_array[root.get_left_id()], from);
+    int rght = find_furthest_leaf(m_node_array[root.get_right_id()], from);
+
+    if (glm::dot(m_sphere_centers[lft], from) > glm::dot(m_sphere_centers[rght], from)) {
+        return lft;
+    }
+    return rght;
+}
+
 
 csg::CSGTree::CSGTree(const std::string &path) {
     using json = nlohmann::json;
@@ -35,14 +96,21 @@ csg::CSGTree::CSGTree(const std::string &path) {
     json j;
     file >> j;
 
-    int p = static_cast<int>(std::ceil(std::log2(static_cast<double>(j["scene"]["max_id"]))));
+    int max_id = static_cast<double>(j["scene"]["max_id"]);
+    if (max_id > 1024) {
+        std::cerr << "[Loader]: Unsupported tree height.\n" << std::endl;
+        return;
+    }
+
+    int p = static_cast<int>(std::ceil(std::log2(max_id)));
+
     m_node_array.resize(std::pow(2, p), Node(-1, -1, Node::None));
 
     const auto& objects = j["scene"]["objects"];
 
     for (const auto& obj : objects) {
         int id = obj["id"];
-        int prim_id = -1;
+        int context_id = -1;
         auto type = str_to_type(obj["type"]);
 
         if (obj["type"] == "sphere") {
@@ -53,18 +121,31 @@ csg::CSGTree::CSGTree(const std::string &path) {
             } else {
                 m_sphere_colors.emplace_back(1.f, 0.f, 0.f);
             }
-            prim_id = m_sphere_centers.size() - 1;
+            context_id = m_sphere_centers.size() - 1;
         }
 
-        m_node_array[id] = Node(id, prim_id, type);
+        m_node_array[id] = Node(id, context_id, type);
     }
-
     m_node_array[0] = Node(0, -1, Node::Guard);
 
-    m_sphere_radiuses.shrink_to_fit();
-    m_sphere_colors.shrink_to_fit();
-    m_sphere_centers.shrink_to_fit();
-    m_node_array.shrink_to_fit();
+    if (!check_correctness(m_node_array[1])) {
+        std::cerr << "[Loader]: The tree is incorrect -- every leaf must be a primitive and every operation must have exactly two children.\n" << std::endl;
+        return;
+    }
+
+    for (int i = 1; i < m_node_array.size(); ++i) {
+        if (m_node_array[i].is_operation()) {
+            auto sum = find_leafs_sum(m_node_array[i]);
+            glm::vec3 avg = sum.first / static_cast<float>(sum.second);
+            int c_id = find_furthest_leaf(m_node_array[i], avg);
+
+            float radius = glm::distance(m_sphere_centers[c_id], avg) + m_sphere_radiuses[c_id];
+            m_sb_centers.push_back(avg);
+            m_sb_radiuses.push_back(radius);
+            m_node_array[i].context_id = m_sb_radiuses.size() - 1;
+        }
+    }
+
 }
 
 csg::Node::Type csg::CSGTree::str_to_type(const std::string &str) {
@@ -79,6 +160,8 @@ csg::Node::Type csg::CSGTree::str_to_type(const std::string &str) {
     }
     return Node::None;
 }
+
+
 
 __host__ __device__ csg::CSGActions::CSGActions(csg::PointState state_l, csg::PointState state_r, const csg::Node &node) {
     static CSGAction union_table[][3] = {

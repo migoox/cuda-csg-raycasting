@@ -46,7 +46,7 @@ int main(int, char**) {
         ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
         std::string executable_dir = std::filesystem::path(__FILE__).parent_path().string();
-        csg::CSGTree tree = csg::CSGTree(executable_dir + "/../res/output255.json");
+        csg::CSGTree tree = csg::CSGTree(executable_dir + "/../res/simple_tree.json");
         ShaderProgram sh(executable_dir + "/../res/billboard.vert", executable_dir + "/../res/billboard.frag");
         sh.bind();
         sh.set_uniform_1i("u_texture", 0);

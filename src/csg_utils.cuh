@@ -4,7 +4,7 @@
 #include <glm/glm.hpp>
 #include <string>
 #include <cuda_runtime.h>
-
+#include <functional>
 namespace csg {
     struct Node {
         enum Type : int {
@@ -18,14 +18,17 @@ namespace csg {
         };
 
         int id;      // id in the array that represents a tree
-        int prim_id; // id of a primitive ( e.g. sphere ), it's -1 if the node is not representing a primitive
+        int context_id; // represents an id of the context basing on the type, for example if type == Sphere, then
+        // context_id refers to center, radius and color
         Type type;   // node type ( if None => the node is invalid)
 
         __host__ __device__ Node() = default;
-        __host__ __device__ Node(int id, int prim_id, Type type);
+        __host__ __device__ Node(int id, int context_id, Type type);
         __host__ __device__ int get_parent_id() const;
         __host__ __device__ int get_left_id() const;
         __host__ __device__ int get_right_id() const;
+        __host__ __device__ bool is_primitive() const;
+        __host__ __device__ bool is_operation() const;
     };
 
     class CSGTree {
@@ -36,9 +39,9 @@ namespace csg {
         size_t get_nodes_count() const { return m_node_array.size(); }
         const std::vector<csg::Node>& nodes() const { return m_node_array; }
 
-        float sphere_radius(int prim_id) const { return m_sphere_radiuses[prim_id]; }
-        const glm::vec3& sphere_center(int prim_id) const { return m_sphere_centers[prim_id]; }
-        const glm::vec3& sphere_color(int prim_id) const { return m_sphere_colors[prim_id]; }
+        float sphere_radius(int context_id) const { return m_sphere_radiuses[context_id]; }
+        const glm::vec3& sphere_center(int context_id) const { return m_sphere_centers[context_id]; }
+        const glm::vec3& sphere_color(int context_id) const { return m_sphere_colors[context_id]; }
 
         const std::vector<float>& sphere_radiuses() const { return m_sphere_radiuses; }
         const std::vector<glm::vec3>& sphere_centers() const { return m_sphere_centers; }
@@ -48,8 +51,18 @@ namespace csg {
     private:
         static Node::Type str_to_type(const std::string& str);
 
+        bool check_correctness(csg::Node root);
+
+        // This function assumes that the tree is correct
+        std::pair<glm::vec3, int> find_leafs_sum(csg::Node root);
+        int find_furthest_leaf(csg::Node root, const glm::vec3& from);
+
     private:
         std::vector<Node> m_node_array;
+
+        //.
+        std::vector<float> m_sb_radiuses;
+        std::vector<glm::vec3> m_sb_centers;
 
         // Spheres
         std::vector<float> m_sphere_radiuses;

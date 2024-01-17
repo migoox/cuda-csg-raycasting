@@ -194,10 +194,10 @@ __device__ csg::IntersectionResult csg_intersect_rec(
 ) {
     // Stop condition
     if (node.type == csg::Node::Type::Sphere) {
-        float t = get_sphere_hit(centers[node.prim_id], radiuses[node.prim_id], origin, dir, min);
+        float t = get_sphere_hit(centers[node.context_id], radiuses[node.context_id], origin, dir, min);
         return csg::IntersectionResult {
                 t,
-                t == -1.f ? glm::vec3(0.f) : normalize(origin + t * dir - centers[node.prim_id]),
+                t == -1.f ? glm::vec3(0.f) : normalize(origin + t * dir - centers[node.context_id]),
                 node.id
         };
     }
@@ -304,15 +304,15 @@ __device__ csg::IntersectionResult csg_intersect_stack(
                 if (nodes[curr_node.get_left_id()].type == csg::Node::Type::Sphere) {
                     goto_l = false;
                     float t = get_sphere_hit(
-                            centers[nodes[curr_node.get_left_id()].prim_id],
-                            radiuses[nodes[curr_node.get_left_id()].prim_id],
+                            centers[nodes[curr_node.get_left_id()].context_id],
+                            radiuses[nodes[curr_node.get_left_id()].context_id],
                             origin,
                             dir,
                             curr_min
                     );
                     res_l = csg::IntersectionResult {
                             t,
-                            t < 0.f ? glm::vec3(0.f) : normalize(origin + t * dir - centers[nodes[curr_node.get_left_id()].prim_id]),
+                            t < 0.f ? glm::vec3(0.f) : normalize(origin + t * dir - centers[nodes[curr_node.get_left_id()].context_id]),
                             t < 0.f ? -1 : curr_node.get_left_id()
                     };
                 }
@@ -320,15 +320,15 @@ __device__ csg::IntersectionResult csg_intersect_stack(
                 if (nodes[curr_node.get_right_id()].type == csg::Node::Type::Sphere) {
                     goto_r = false;
                     float t = get_sphere_hit(
-                            centers[nodes[curr_node.get_right_id()].prim_id],
-                            radiuses[nodes[curr_node.get_right_id()].prim_id],
+                            centers[nodes[curr_node.get_right_id()].context_id],
+                            radiuses[nodes[curr_node.get_right_id()].context_id],
                             origin,
                             dir,
                             curr_min
                     );
                     res_r = csg::IntersectionResult {
                             t,
-                            t < 0.f ? glm::vec3(0.f) : normalize(origin + t * dir - centers[nodes[curr_node.get_right_id()].prim_id]),
+                            t < 0.f ? glm::vec3(0.f) : normalize(origin + t * dir - centers[nodes[curr_node.get_right_id()].context_id]),
                             t < 0.f ? -1 : curr_node.get_right_id()
                     };
                 }
@@ -355,8 +355,8 @@ __device__ csg::IntersectionResult csg_intersect_stack(
                 // curr_node is a Primitive. This section will be invoked if LoopRight or LoopLeft
                 // has been called, or if the root is a primitive
                 float t = get_sphere_hit(
-                        centers[curr_node.prim_id],
-                        radiuses[curr_node.prim_id],
+                        centers[curr_node.context_id],
+                        radiuses[curr_node.context_id],
                         origin,
                         dir,
                         curr_min
@@ -364,13 +364,13 @@ __device__ csg::IntersectionResult csg_intersect_stack(
                 if (curr_state == csg::StackState::GoToLeft) {
                     res_l = csg::IntersectionResult {
                             t,
-                            t < 0.f ? glm::vec3(0.f) : normalize(origin + t * dir - centers[curr_node.prim_id]),
+                            t < 0.f ? glm::vec3(0.f) : normalize(origin + t * dir - centers[curr_node.context_id]),
                             t < 0.f ? -1 : curr_node.id
                     };
                 } else { // GoToRight
                     res_r = csg::IntersectionResult {
                             t,
-                            t < 0.f ? glm::vec3(0.f) : normalize(origin + t * dir - centers[curr_node.prim_id]),
+                            t < 0.f ? glm::vec3(0.f) : normalize(origin + t * dir - centers[curr_node.context_id]),
                             t < 0.f ? -1 : curr_node.id
                     };
                 }
@@ -509,7 +509,7 @@ uint32_t k = blockIdx.x * blockDim.x + threadIdx.x;
     if (result.leaf_id == -1) {
         canvas[k] = on_miss();
     } else {
-        canvas[k] = on_hit(origins[k] + dirs[k] * result.t, result.normal, colors[sm_nodes[result.leaf_id].prim_id]);
+        canvas[k] = on_hit(origins[k] + dirs[k] * result.t, result.normal, colors[sm_nodes[result.leaf_id].context_id]);
     }
 }
 
@@ -563,7 +563,7 @@ __global__ void csg_trace_ray_rec(
     if (result.leaf_id == -1) {
         canvas[k] = on_miss();
     } else {
-        canvas[k] = on_hit(origins[k] + dirs[k] * result.t, result.normal, colors[sm_nodes[result.leaf_id].prim_id]);
+        canvas[k] = on_hit(origins[k] + dirs[k] * result.t, result.normal, colors[sm_nodes[result.leaf_id].context_id]);
     }
 }
 

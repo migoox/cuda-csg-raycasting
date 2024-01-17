@@ -89,10 +89,10 @@ namespace cpu_raytracer {
     csg::IntersectionResult csg_intersect(const csg::CSGTree& tree, const vec3& origin, const vec3& dir, csg::Node node, float min) {
         // Stop condition
         if (node.type == csg::Node::Type::Sphere) {
-            float t = get_sphere_hit(tree.sphere_center(node.prim_id), tree.sphere_radius(node.prim_id), origin, dir, min);
+            float t = get_sphere_hit(tree.sphere_center(node.context_id), tree.sphere_radius(node.context_id), origin, dir, min);
             return IntersectionResult {
                     t,
-                    t == -1.f ? vec3(0.f) : normalize(origin + t * dir - tree.sphere_center(node.prim_id)),
+                    t == -1.f ? vec3(0.f) : normalize(origin + t * dir - tree.sphere_center(node.context_id)),
                     node.id
             };
         }
@@ -152,7 +152,7 @@ namespace cpu_raytracer {
             return on_miss();
         }
 
-        return on_hit(origin + dir * result.t, result.normal, tree.sphere_color(tree.get_node(result.leaf_id).prim_id));
+        return on_hit(origin + dir * result.t, result.normal, tree.sphere_color(tree.get_node(result.leaf_id).context_id));
     }
 
     uint32_t trace_ray(const csg::CSGTree& tree, const vec3& origin, const vec3& dir) {
