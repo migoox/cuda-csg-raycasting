@@ -7,6 +7,7 @@ namespace cuda_raycaster {
     class GPURayCaster {
     public:
         struct Input {
+            glm::vec3 sun;
             glm::mat4 inv_proj;
             glm::mat4 inv_view;
             glm::vec3 eye;

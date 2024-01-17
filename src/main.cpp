@@ -30,14 +30,20 @@ using namespace renderer;
 const int INIT_SCREEN_SIZE_X = 800;
 const int INIT_SCREEN_SIZE_Y = 600;
 
+glm::vec3 get_sun_pos(float polar, float azim) {
+    float x = sin(polar) * cos(azim);
+    float y = cos(polar);
+    float z = sin(polar) * sin(azim);
 
+    return glm::vec3(x, y, z);
+}
 
 int main(int, char**) {
     // Init GLFW
     Backend::init_glfw();
     {
         // Create a window
-        Window window(INIT_SCREEN_SIZE_X, INIT_SCREEN_SIZE_Y, "Cuda csg ray casting");
+        Window window(INIT_SCREEN_SIZE_X, INIT_SCREEN_SIZE_Y, "CUDA csg ray casting");
 
         // Init GLEW and ImGui
         Backend::init_glew();
@@ -69,10 +75,13 @@ int main(int, char**) {
         bool show_csg = true;
         bool cpu = false;
         bool cam_moving = false;
+        float sun_polar_angle = glm::radians(45.f);
+        float sun_azim_angle = glm::radians(45.f);
 
         cuda_raycaster::GPURayCaster gpu_rc = cuda_raycaster::GPURayCaster(tree, INIT_SCREEN_SIZE_X, INIT_SCREEN_SIZE_Y);
 
         gpu_rc.update_canvas(canvas, cuda_raycaster::GPURayCaster::Input {
+                get_sun_pos(sun_polar_angle, sun_azim_angle),
                 cam_operator.get_cam().get_inv_proj(),
                 cam_operator.get_cam().get_inv_view(),
                 cam_operator.get_cam().get_pos(),
@@ -96,7 +105,11 @@ int main(int, char**) {
                 // Display floating text
                 ImGui::SetNextWindowPos(ImVec2(0, 0)); // Set position for the text
                 ImGui::SetNextWindowSize(ImVec2(100, 100));
-                ImGui::Begin("Floating Text", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings);
+                ImGui::Begin("Floating Text", nullptr,
+                             ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoBackground |
+                             ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
+                             ImGuiWindowFlags_NoSavedSettings
+                );
                 ImGui::Text("FPS: %.1f", fps_counter.get_curr_fps());
                 ImGui::End();
 
@@ -112,6 +125,7 @@ int main(int, char**) {
                         tree.load(file_path);
                         gpu_rc.set_tree(tree);
                         gpu_rc.update_canvas(canvas, cuda_raycaster::GPURayCaster::Input {
+                                get_sun_pos(sun_polar_angle, sun_azim_angle),
                                 cam_operator.get_cam().get_inv_proj(),
                                 cam_operator.get_cam().get_inv_view(),
                                 cam_operator.get_cam().get_pos(),
@@ -127,10 +141,36 @@ int main(int, char**) {
                 ImGui::Checkbox("CPU", &cpu);
                 if (ImGui::Checkbox("CSG on", &show_csg)) {
                     if (cpu) {
-                        cpu_raytracer::update_canvas(canvas, cam_operator, tree, show_csg);
+                        cpu_raytracer::update_canvas(get_sun_pos(sun_polar_angle, sun_azim_angle), canvas, cam_operator, tree, show_csg);
                         txt_res->update(canvas);
                     } else {
                         gpu_rc.update_canvas(canvas, cuda_raycaster::GPURayCaster::Input {
+                            get_sun_pos(sun_polar_angle, sun_azim_angle),
+                                cam_operator.get_cam().get_inv_proj(),
+                                cam_operator.get_cam().get_inv_view(),
+                                cam_operator.get_cam().get_pos(),
+                                glm::vec2(INIT_SCREEN_SIZE_X, INIT_SCREEN_SIZE_Y),
+                                tree,
+                                show_csg,
+                        });
+                    }
+                    txt_res->update(canvas);
+                }
+                bool update_light = false;
+                if (ImGui::SliderAngle("Polar angle", &sun_polar_angle, -180.f, 180.f)) {
+                    update_light = true;
+                }
+                if (ImGui::SliderAngle("Azim angle", &sun_azim_angle, -180.f, 180.f)) {
+                    update_light = true;
+                }
+
+                if (update_light) {
+                    if (cpu) {
+                        cpu_raytracer::update_canvas(get_sun_pos(sun_polar_angle, sun_azim_angle), canvas, cam_operator, tree, show_csg);
+                        txt_res->update(canvas);
+                    } else {
+                        gpu_rc.update_canvas(canvas, cuda_raycaster::GPURayCaster::Input {
+                            get_sun_pos(sun_polar_angle, sun_azim_angle),
                                 cam_operator.get_cam().get_inv_proj(),
                                 cam_operator.get_cam().get_inv_view(),
                                 cam_operator.get_cam().get_pos(),
@@ -150,15 +190,19 @@ int main(int, char**) {
             // Calculate delta time
             current_time = std::chrono::steady_clock::now();
             delta_time = std::chrono::duration_cast<std::chrono::duration<float>>(current_time - previous_time);
-            fps_counter.update(std::chrono::duration_cast<std::chrono::duration<double>>(current_time - previous_time).count());
+            if (cam_moving) {
+                fps_counter.update(std::chrono::duration_cast<std::chrono::duration<double>>(current_time - previous_time).count());
+            }
             previous_time = current_time;
 
             if (cam_operator.update(window, delta_time.count())) {
+                cam_moving = true;
                 if (cpu) {
-                    cpu_raytracer::update_canvas(canvas, cam_operator, tree, show_csg);
+                    cpu_raytracer::update_canvas(get_sun_pos(sun_polar_angle, sun_azim_angle), canvas, cam_operator, tree, show_csg);
                     txt_res->update(canvas);
                 } else {
                     gpu_rc.update_canvas(canvas, cuda_raycaster::GPURayCaster::Input {
+                            get_sun_pos(sun_polar_angle, sun_azim_angle),
                             cam_operator.get_cam().get_inv_proj(),
                             cam_operator.get_cam().get_inv_view(),
                             cam_operator.get_cam().get_pos(),
@@ -168,6 +212,9 @@ int main(int, char**) {
                     });
                 }
                 txt_res->update(canvas);
+            } else {
+                fps_counter.reset();
+                cam_moving = false;
             }
 
             // Update opengl viewport
@@ -186,7 +233,7 @@ int main(int, char**) {
 
             window.swap_buffers();
         }
-        //Backend::terminate_imgui();
+        Backend::terminate_imgui();
         // glfw window terminates here
     }
     Backend::terminate_glfw();

@@ -7,7 +7,7 @@
 
 namespace cpu_raytracer {
 
-    void update_canvas(renderer::Image& canvas, app::CameraOperator& cam_operator, const csg::CSGTree& tree, bool show_csg);
+    void update_canvas(glm::vec3 sun, renderer::Image& canvas, app::CameraOperator& cam_operator, const csg::CSGTree& tree, bool show_csg);
 
     float get_sphere_hit(glm::vec3 center, float radius, glm::vec3 ray_origin, glm::vec3 ray_dir, float min = 0.f);
 

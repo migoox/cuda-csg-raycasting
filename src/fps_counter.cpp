@@ -13,4 +13,10 @@ void utils::FPSCounter::update(double delta_time) {
     }
 }
 
+void utils::FPSCounter::reset() {
+    m_curr_fps = 0.0;
+    m_deltas_sum = 0.0;
+    m_frames_count = 0;
+}
+
 

@@ -7,7 +7,10 @@ namespace cpu_raytracer {
     using namespace glm;
     using namespace csg;
 
-    void update_canvas(renderer::Image& canvas, app::CameraOperator& cam_operator, const csg::CSGTree& tree, bool show_csg) {
+    static glm::vec3 sun_pos = glm::vec3(0.f, 1.f, 0.f);
+    static glm::vec3 cam_pos = glm::vec3(0.f, 1.f, 0.f);
+
+    void update_canvas(glm::vec3 sun, renderer::Image& canvas, app::CameraOperator& cam_operator, const csg::CSGTree& tree, bool show_csg) {
         for (int y = 0; y < canvas.get_height(); y++) {
             for (int x = 0; x < canvas.get_width(); x++) {
                 canvas.set_pixel(x, y, cpu_raytracer::per_pixel(x, y,
@@ -19,6 +22,9 @@ namespace cpu_raytracer {
                                                                 show_csg));
             }
         }
+
+        sun_pos = glm::normalize(sun);
+        cam_pos = cam_operator.get_cam().get_pos();
     }
 
     // Returns parametric function argument (t), returns -1.f in the case there was no hit
@@ -58,9 +64,15 @@ namespace cpu_raytracer {
         // normal = 0.5f * (normal + 1.f);
         // return get_color_rgb_norm(normal.r, normal.g, normal.b);
 
-        vec3 light_dir = normalize(light_pos - hit_point);
-
-        vec3 res_color = color * glm::clamp(glm::dot(normal, light_dir), 0.f, 1.f);
+        glm::vec3 light_dir = sun_pos;
+        // Ambient + Diffuse + Specular
+        glm::vec3 res_color = color * glm::clamp(
+                0.1f +
+                glm::clamp(glm::dot(normal, light_dir), 0.f, 1.f) +
+                pow(glm::clamp(glm::dot(
+                        glm::normalize(cam_pos - hit_point),
+                        glm::reflect(-light_dir, normal)), 0.f, 1.f), 32.f), 0.f, 1.f
+        );
 
         return renderer::get_color_rgb_norm(res_color.r, res_color.g, res_color.b);
     }

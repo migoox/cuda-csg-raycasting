@@ -9,6 +9,7 @@ namespace utils {
         explicit FPSCounter(double interval = 0.5);
 
         void update(double delta_time);
+        void reset();
 
         double get_curr_fps() const { return m_curr_fps; }
 

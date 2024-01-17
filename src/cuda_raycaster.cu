@@ -4,6 +4,8 @@
 #include "cuda_raycaster.cuh"
 #include <cuda_runtime.h>
 #include "cuda_stack.cuh"
+__device__ glm::vec3 sun_pos;
+__device__ glm::vec3 cam_pos;
 
 __device__ uint32_t get_color_rgb_norm(float r, float g, float b) {
     return static_cast<uint32_t>(std::round(r * 255.f)) << 24 |
@@ -51,14 +53,19 @@ __device__ float get_sphere_hit(glm::vec3 center, float radius, glm::vec3 ray_or
 }
 
 __device__ uint32_t on_hit(glm::vec3 hit_point, glm::vec3 normal, glm::vec3 color) {
-    glm::vec3 light_pos = glm::vec3(0.f, 1.f, 0.f);
-
     // normal = 0.5f * (normal + 1.f);
     // return get_color_rgb_norm(normal.r, normal.g, normal.b);
 
-    glm::vec3 light_dir = normalize(light_pos - hit_point);
-
-    glm::vec3 res_color = color * glm::clamp(glm::dot(normal, light_dir), 0.f, 1.f);
+    // Assuming that sun_pos is normalized
+    glm::vec3 light_dir = sun_pos;
+    // Ambient + Diffuse + Specular
+    glm::vec3 res_color = color * glm::clamp(
+            0.1f +
+            glm::clamp(glm::dot(normal, light_dir), 0.f, 1.f) +
+            pow(glm::clamp(glm::dot(
+                    glm::normalize(cam_pos - hit_point),
+                    glm::reflect(-light_dir, normal)), 0.f, 1.f), 32.f), 0.f, 1.f
+    );
 
     return get_color_rgb_norm(res_color.r, res_color.g, res_color.b);
 }
@@ -675,6 +682,9 @@ __global__ void trace_ray(
 
 void cuda_raycaster::GPURayCaster::update_canvas(renderer::Image &canvas,
                                                  const cuda_raycaster::GPURayCaster::Input &input) {
+    glm::vec3 sun = glm::normalize(input.sun);
+    cudaMemcpyToSymbol(sun_pos, &sun, sizeof(glm::vec3));
+    cudaMemcpyToSymbol(cam_pos, &input.eye, sizeof(glm::vec3));
     resize(canvas.get_width(), canvas.get_height());
     size_t threads_per_block = 1024;
     size_t blocks_num = m_width * m_height / threads_per_block + 1;
