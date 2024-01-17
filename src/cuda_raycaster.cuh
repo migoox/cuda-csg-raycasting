@@ -29,6 +29,10 @@ namespace cuda_raycaster {
         glm::vec3 *m_dev_dirs{};
         uint32_t *m_dev_canvas{};
 
+        float* m_dev_boundings_radiuses{};
+        glm::vec3* m_dev_boundings_centers{};
+        uint32_t m_operations_count;
+
         float *m_dev_radiuses{};
         glm::vec3 *m_dev_centers{};
         glm::vec3 *m_dev_colors{};

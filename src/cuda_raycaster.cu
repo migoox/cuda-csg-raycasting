@@ -113,6 +113,10 @@ cuda_raycaster::GPURayCaster::GPURayCaster(const csg::CSGTree& tree, int width, 
     check_cuda_error(cuda_status, "[CUDA]: cudaMalloc failed: ");
     cuda_status = cudaMalloc((void**)&m_dev_node_array, tree.get_nodes_count() * sizeof(csg::Node));
     check_cuda_error(cuda_status, "[CUDA]: cudaMalloc failed: ");
+    cuda_status = cudaMalloc((void**)&m_dev_boundings_radiuses, tree.get_operations_count() * sizeof(float));
+    check_cuda_error(cuda_status, "[CUDA]: cudaMalloc failed: ");
+    cuda_status = cudaMalloc((void**)&m_dev_boundings_centers, tree.get_operations_count() * sizeof(glm::vec3));
+    check_cuda_error(cuda_status, "[CUDA]: cudaMalloc failed: ");
 
     // Move tree data to the gpu
     cuda_status = cudaMemcpy(m_dev_radiuses, tree.sphere_radiuses().data(), tree.get_sphere_count() * sizeof(float), cudaMemcpyHostToDevice);
@@ -123,9 +127,14 @@ cuda_raycaster::GPURayCaster::GPURayCaster(const csg::CSGTree& tree, int width, 
     check_cuda_error(cuda_status, "[CUDA]: cudaMemcpy failed: ");
     cuda_status = cudaMemcpy(m_dev_node_array, tree.nodes().data(), tree.get_nodes_count() * sizeof(csg::Node), cudaMemcpyHostToDevice);
     check_cuda_error(cuda_status, "[CUDA]: cudaMemcpy failed: ");
+    cuda_status = cudaMemcpy(m_dev_boundings_radiuses, tree.boundings_radiuses().data(), tree.get_operations_count() * sizeof(float), cudaMemcpyHostToDevice);
+    check_cuda_error(cuda_status, "[CUDA]: cudaMemcpy failed: ");
+    cuda_status = cudaMemcpy(m_dev_boundings_centers, tree.boundings_centers().data(), tree.get_operations_count() * sizeof(glm::vec3), cudaMemcpyHostToDevice);
+    check_cuda_error(cuda_status, "[CUDA]: cudaMemcpy failed: ");
 
     m_spheres_count = tree.get_sphere_count();
     m_nodes_count = tree.get_nodes_count();
+    m_operations_count = tree.get_operations_count();
 }
 
 
@@ -253,6 +262,8 @@ __device__ csg::IntersectionResult csg_intersect_stack(
         int nodes_count,
         float *radiuses,
         glm::vec3 *centers,
+        float *boundings_radiuses,
+        glm::vec3 *boundings_centers,
         glm::vec3 origin,
         glm::vec3 dir
 ) {
@@ -291,17 +302,21 @@ __device__ csg::IntersectionResult csg_intersect_stack(
             }
 
             // Update stacks
-            if (curr_node.type != csg::Node::Sphere) {
-                bool goto_l = true; // Intersect box can be added
-                bool goto_r = true; // Intersect box can be added
+            if (curr_node.is_operation()) {
 
                 // There are 4 possible cases:
                 //      1. both children are Primitives -- goto_L == false, goto_R == false,
                 //      2. left child is a Primitive -- goto_L == false, goto_R == true,
                 //      3. right child is a Primitive -- goto_L == true, goto_R == false,
                 //      4. both children are Operations -- goto_L == true, goto_R == true.
+                //
+                //      If ray is out of the sphere bounding it's equivalent of Primitive Miss.
+                //
 
-                if (nodes[curr_node.get_left_id()].type == csg::Node::Type::Sphere) {
+                bool goto_l = true;
+                bool goto_r = true;
+
+                if (nodes[curr_node.get_left_id()].is_primitive()) {
                     goto_l = false;
                     float t = get_sphere_hit(
                             centers[nodes[curr_node.get_left_id()].context_id],
@@ -315,9 +330,27 @@ __device__ csg::IntersectionResult csg_intersect_stack(
                             t < 0.f ? glm::vec3(0.f) : normalize(origin + t * dir - centers[nodes[curr_node.get_left_id()].context_id]),
                             t < 0.f ? -1 : curr_node.get_left_id()
                     };
+                } else {
+                    // Check sphere bounding
+//                    float t = get_sphere_hit(
+//                            boundings_centers[nodes[curr_node.get_left_id()].context_id],
+//                            boundings_radiuses[nodes[curr_node.get_left_id()].context_id],
+//                            origin,
+//                            dir,
+//                            curr_min
+//                    );
+////
+//                    if (t < 0.f) {
+//                        goto_l = false;
+//                        res_l = csg::IntersectionResult {
+//                            -1.f,
+//                            glm::vec3(0.f),
+//                            -1
+//                        };
+//                    }
                 }
 
-                if (nodes[curr_node.get_right_id()].type == csg::Node::Type::Sphere) {
+                if (nodes[curr_node.get_right_id()].is_primitive()) {
                     goto_r = false;
                     float t = get_sphere_hit(
                             centers[nodes[curr_node.get_right_id()].context_id],
@@ -331,6 +364,24 @@ __device__ csg::IntersectionResult csg_intersect_stack(
                             t < 0.f ? glm::vec3(0.f) : normalize(origin + t * dir - centers[nodes[curr_node.get_right_id()].context_id]),
                             t < 0.f ? -1 : curr_node.get_right_id()
                     };
+                } else {
+                    // Check sphere bounding
+//                    float t = get_sphere_hit(
+//                            boundings_centers[nodes[curr_node.get_right_id()].context_id],
+//                            boundings_radiuses[nodes[curr_node.get_right_id()].context_id],
+//                            origin,
+//                            dir,
+//                            curr_min
+//                    );
+////
+//                    if (t < 0.f) {
+//                        goto_r = false;
+//                        res_r = csg::IntersectionResult {
+//                            -1.f,
+//                            glm::vec3(0.f),
+//                            -1
+//                        };
+//                    }
                 }
 
                 if (!goto_l && !goto_r) { // case 1
@@ -464,6 +515,8 @@ __global__ void csg_trace_ray_stack(
         float *radiuses,
         glm::vec3 *centers,
         glm::vec3 *colors,
+        float *boundings_radiuses,
+        glm::vec3 *boundings_centers,
         int prim_count,
         int nodes_count,
         uint32_t *canvas,
@@ -504,7 +557,7 @@ uint32_t k = blockIdx.x * blockDim.x + threadIdx.x;
         canvas[k] = on_miss();
     }
 
-    auto result = csg_intersect_stack(sm_nodes, prim_count, nodes_count, sm_radiuses, sm_centers, origins[k], dirs[k]);
+    auto result = csg_intersect_stack(sm_nodes, prim_count, nodes_count, sm_radiuses, sm_centers, boundings_radiuses, boundings_centers, origins[k], dirs[k]);
 
     if (result.leaf_id == -1) {
         canvas[k] = on_miss();
@@ -629,6 +682,8 @@ void cuda_raycaster::GPURayCaster::update_canvas(renderer::Image &canvas,
                 m_dev_radiuses,
                 m_dev_centers,
                 m_dev_colors,
+                m_dev_boundings_radiuses,
+                m_dev_boundings_centers,
                 m_spheres_count,
                 m_nodes_count,
                 m_dev_canvas,

@@ -4,7 +4,7 @@
 #include <glm/glm.hpp>
 #include <string>
 #include <cuda_runtime.h>
-#include <functional>
+
 namespace csg {
     struct Node {
         enum Type : int {
@@ -47,6 +47,10 @@ namespace csg {
         const std::vector<glm::vec3>& sphere_centers() const { return m_sphere_centers; }
         const std::vector<glm::vec3>& sphere_colors() const { return m_sphere_colors; }
         size_t get_sphere_count() const { return m_sphere_radiuses.size(); }
+
+        const std::vector<float>& boundings_radiuses() const { return m_sb_radiuses; }
+        const std::vector<glm::vec3>& boundings_centers() const { return m_sb_centers; }
+        size_t get_operations_count() const { return m_sb_radiuses.size(); }
 
     private:
         static Node::Type str_to_type(const std::string& str);
