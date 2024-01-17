@@ -7,6 +7,9 @@ __host__ __device__ csg::Node::Node(int id, int prim_id, csg::Node::Type type)
  : id(id), prim_id(prim_id), type(type) { }
 
 __host__ __device__ int csg::Node::get_left_id() const {
+    if (id == 0) {
+        return 1;
+    }
     return 2 * id;
 }
 
@@ -56,7 +59,7 @@ csg::CSGTree::CSGTree(const std::string &path) {
         m_node_array[id] = Node(id, prim_id, type);
     }
 
-    m_node_array[0] = Node(-1, -1, Node::Guard);
+    m_node_array[0] = Node(0, -1, Node::Guard);
 
     m_sphere_radiuses.shrink_to_fit();
     m_sphere_colors.shrink_to_fit();

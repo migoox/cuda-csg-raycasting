@@ -38,6 +38,7 @@ namespace cuda_raycaster {
         uint32_t m_nodes_count;
     };
 
+
 }
 
 #endif //CUDA_CSG_RAYCASTING_CUDA_RAYCASTER_CUH

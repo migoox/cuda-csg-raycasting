@@ -57,6 +57,16 @@ namespace csg {
         std::vector<glm::vec3> m_sphere_colors;
     };
 
+    enum class StackState {
+        None,
+        GoToLeft,
+        GoToRight,
+        Compute,
+        LoadLeft,
+        LoadRight,
+        SaveLeft
+    };
+
     enum class PointState : int {
         Enter,
         Exit,
@@ -86,9 +96,9 @@ namespace csg {
     };
 
     struct IntersectionResult {
-        float t; // if t == -1.0f => miss
-        glm::vec3 normal;
-        int leaf_id; // -1 => miss
+        float t = -1.f; // if t == -1.0f => miss
+        glm::vec3 normal = glm::vec3(0.f);
+        int leaf_id = -1; // -1 => miss
     };
 }
 
