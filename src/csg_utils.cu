@@ -89,6 +89,13 @@ int csg::CSGTree::find_furthest_leaf(csg::Node root, const glm::vec3& from) {
 }
 
 void csg::CSGTree::load(const std::string& path) {
+    m_node_array.clear();
+    m_sphere_colors.clear();
+    m_sphere_radiuses.clear();
+    m_sphere_centers.clear();
+    m_sb_radiuses.clear();
+    m_sb_centers.clear();
+
     using json = nlohmann::json;
     std::ifstream file(path);
 

@@ -1,0 +1,69 @@
+{
+    "scene": {
+        "max_id": 11,
+        "objects": [
+            {
+                "id": 1,
+                "type": "union"
+            }, 
+            {
+                "id": 2,
+                "type": "diff"
+            }, 
+            {
+                "id": 3,
+                "type": "inter"
+            },
+            {
+                "id": 4,
+                "type": "diff"
+            },
+            {
+                "id": 5,
+                "type": "union"
+            },
+            {
+                "id": 6,
+                "type": "sphere",
+                "radius": 0.5,
+                "center": { "x": -2, "y": 0.0, "z": -5.0 },
+                "color": { "r": 0.0, "g": 1.0, "b": 0.0 }
+            },
+            {
+                "id": 7,
+                "type": "sphere",
+                "radius": 0.5,
+                "center": { "x": -2.5, "y": 0.0, "z": -5.0 },
+                "color": { "r": 1.0, "g": 0.0, "b": 1.0 }
+            },
+            {
+                "id": 8,
+                "type": "sphere",
+                "radius": 1.0,
+                "center": { "x": -2.0, "y": 0.0, "z": -5.0 },
+                "color": { "r": 1.0, "g": 1.0, "b": 0.0 }
+            },
+            {
+                "id": 9,
+                "type": "sphere",
+                "radius": 2.5,
+                "center": { "x": 0.0, "y": 0.0, "z": -5.0 },
+                "color": { "r": 0.0, "g": 1.0, "b": 1.0 }
+            },
+            {
+                "id": 10,
+                "type": "sphere",
+                "radius": 0.7,
+                "center": { "x": -2.0, "y": 1.0, "z": -5.0 },
+                "color": { "r": 1.0, "g": 0.0, "b": 0.0 }
+            },
+            {
+                "id": 11,
+                "type": "sphere",
+                "radius": 0.7,
+                "center": { "x": -2.0, "y": -1.0, "z": -5.0 },
+                "color": { "r": 0.0, "g": 0.0, "b": 1.0 }
+            }
+        ]
+    }
+}
