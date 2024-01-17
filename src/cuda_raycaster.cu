@@ -83,28 +83,8 @@ __global__ void init(uint32_t *canvas, glm::vec3 *origins, glm::vec3 *dirs, int 
     }
 }
 
-cuda_raycaster::GPURayCaster::GPURayCaster(const csg::CSGTree& tree, int width, int height)
-: m_width(width), m_height(height) {
+void cuda_raycaster::GPURayCaster::load_tree(const csg::CSGTree &tree) {
     cudaError_t cuda_status;
-
-    // Allocate memory on the device using cudaMalloc
-    cuda_status = cudaMalloc((void**)&m_dev_canvas, width * height * sizeof(uint32_t));
-    check_cuda_error(cuda_status, "[CUDA]: cudaMalloc failed: ");
-    cuda_status = cudaMalloc((void**)&m_dev_origins, width * height * sizeof(glm::vec3));
-    check_cuda_error(cuda_status, "[CUDA]: cudaMalloc failed: ");
-    cuda_status = cudaMalloc((void**)&m_dev_dirs, width * height * sizeof(glm::vec3));
-    check_cuda_error(cuda_status, "[CUDA]: cudaMalloc failed: ");
-
-    size_t threads_per_block = 1024;
-    size_t blocks_num = m_width * m_height / threads_per_block + 1;
-    init<<<blocks_num, threads_per_block>>>(
-            m_dev_canvas,
-            m_dev_origins,
-            m_dev_dirs,
-            width * height
-    );
-    cudaDeviceSynchronize();
-
     cuda_status = cudaMalloc((void**)&m_dev_radiuses, tree.get_sphere_count() * sizeof(float));
     check_cuda_error(cuda_status, "[CUDA]: cudaMalloc failed: ");
     cuda_status = cudaMalloc((void**)&m_dev_centers, tree.get_sphere_count() * sizeof(glm::vec3));
@@ -137,6 +117,41 @@ cuda_raycaster::GPURayCaster::GPURayCaster(const csg::CSGTree& tree, int width, 
     m_operations_count = tree.get_operations_count();
 }
 
+void cuda_raycaster::GPURayCaster::set_tree(const csg::CSGTree &tree) {
+    cudaFree(m_dev_radiuses);
+    cudaFree(m_dev_centers);
+    cudaFree(m_dev_colors);
+    cudaFree(m_dev_node_array);
+    cudaFree(m_dev_boundings_radiuses);
+    cudaFree(m_dev_boundings_centers);
+
+    load_tree(tree);
+}
+
+cuda_raycaster::GPURayCaster::GPURayCaster(const csg::CSGTree& tree, int width, int height)
+: m_width(width), m_height(height) {
+    cudaError_t cuda_status;
+
+    // Allocate memory on the device using cudaMalloc
+    cuda_status = cudaMalloc((void**)&m_dev_canvas, width * height * sizeof(uint32_t));
+    check_cuda_error(cuda_status, "[CUDA]: cudaMalloc failed: ");
+    cuda_status = cudaMalloc((void**)&m_dev_origins, width * height * sizeof(glm::vec3));
+    check_cuda_error(cuda_status, "[CUDA]: cudaMalloc failed: ");
+    cuda_status = cudaMalloc((void**)&m_dev_dirs, width * height * sizeof(glm::vec3));
+    check_cuda_error(cuda_status, "[CUDA]: cudaMalloc failed: ");
+
+    size_t threads_per_block = 1024;
+    size_t blocks_num = m_width * m_height / threads_per_block + 1;
+    init<<<blocks_num, threads_per_block>>>(
+            m_dev_canvas,
+            m_dev_origins,
+            m_dev_dirs,
+            width * height
+    );
+    cudaDeviceSynchronize();
+    load_tree(tree);
+}
+
 
 cuda_raycaster::GPURayCaster::~GPURayCaster() {
     cudaFree(m_dev_origins);
@@ -147,6 +162,8 @@ cuda_raycaster::GPURayCaster::~GPURayCaster() {
     cudaFree(m_dev_centers);
     cudaFree(m_dev_colors);
     cudaFree(m_dev_node_array);
+    cudaFree(m_dev_boundings_radiuses);
+    cudaFree(m_dev_boundings_centers);
 }
 
 __global__ void find_dirs(
@@ -731,4 +748,5 @@ void cuda_raycaster::GPURayCaster::resize(int width, int height) {
     cuda_status = cudaMalloc((void**)&m_dev_canvas, width * height * sizeof(uint32_t));
     check_cuda_error(cuda_status, "[CUDA]: cudaMalloc failed: ");
 }
+
 

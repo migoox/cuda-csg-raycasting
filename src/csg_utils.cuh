@@ -52,6 +52,8 @@ namespace csg {
         const std::vector<glm::vec3>& boundings_centers() const { return m_sb_centers; }
         size_t get_operations_count() const { return m_sb_radiuses.size(); }
 
+        void load(const std::string& path);
+
     private:
         static Node::Type str_to_type(const std::string& str);
 

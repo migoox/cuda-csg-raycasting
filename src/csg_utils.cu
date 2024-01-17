@@ -88,8 +88,7 @@ int csg::CSGTree::find_furthest_leaf(csg::Node root, const glm::vec3& from) {
     return rght;
 }
 
-
-csg::CSGTree::CSGTree(const std::string &path) {
+void csg::CSGTree::load(const std::string& path) {
     using json = nlohmann::json;
     std::ifstream file(path);
 
@@ -146,6 +145,16 @@ csg::CSGTree::CSGTree(const std::string &path) {
         }
     }
 
+    m_node_array.shrink_to_fit();
+    m_sphere_colors.shrink_to_fit();
+    m_sphere_radiuses.shrink_to_fit();
+    m_sphere_centers.shrink_to_fit();
+    m_sb_radiuses.shrink_to_fit();
+    m_sb_centers.shrink_to_fit();
+}
+
+csg::CSGTree::CSGTree(const std::string &path) {
+    this->load(path);
 }
 
 csg::Node::Type csg::CSGTree::str_to_type(const std::string &str) {
@@ -160,8 +169,6 @@ csg::Node::Type csg::CSGTree::str_to_type(const std::string &str) {
     }
     return Node::None;
 }
-
-
 
 __host__ __device__ csg::CSGActions::CSGActions(csg::PointState state_l, csg::PointState state_r, const csg::Node &node) {
     static CSGAction union_table[][3] = {

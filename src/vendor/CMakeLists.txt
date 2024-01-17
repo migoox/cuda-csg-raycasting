@@ -5,6 +5,10 @@ file(GLOB IMGUI_SOURCES
         "imgui/*.cpp"
         "imgui/backend/*.h"
         "imgui/backend/*.cpp"
+        "FileBrowser/*.h"
+        "FileBrowser/*.cpp"
+        "FileBrowser/dirent/dirent.h"
+        "stbi_image.h"
 )
 
 # Add the source files to your executable or library

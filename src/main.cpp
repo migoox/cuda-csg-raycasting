@@ -19,6 +19,7 @@
 #include "cpu_raycaster.hpp"
 
 #include "cuda_raycaster.cuh"
+#include "vendor/FileBrowser/ImGuiFileDialog.h"
 
 #if defined(_MSC_VER) && (_MSC_VER >= 1900) && !defined(IMGUI_DISABLE_WIN32_FUNCTIONS)
 #pragma comment(lib, "legacy_stdio_definitions")
@@ -47,6 +48,7 @@ int main(int, char**) {
 
         std::string executable_dir = std::filesystem::path(__FILE__).parent_path().string();
         csg::CSGTree tree = csg::CSGTree(executable_dir + "/../res/simple_tree.json");
+
         ShaderProgram sh(executable_dir + "/../res/billboard.vert", executable_dir + "/../res/billboard.frag");
         sh.bind();
         sh.set_uniform_1i("u_texture", 0);
@@ -64,6 +66,7 @@ int main(int, char**) {
 
         bool show_csg = true;
         bool cpu = false;
+        bool open = false;
 
         cuda_raycaster::GPURayCaster gpu_rc = cuda_raycaster::GPURayCaster(tree, INIT_SCREEN_SIZE_X, INIT_SCREEN_SIZE_Y);
 
@@ -95,7 +98,30 @@ int main(int, char**) {
                 ImGui::Text("%.1f FPS", 1.f / delta_time.count());
                 ImGui::End();
 
-                ImGui::Button("Load Scene");
+                if (ImGui::Button("Load Scene")) {
+                    IGFD::FileDialogConfig config;
+                    config.path = ".";
+                    ImGuiFileDialog::Instance()->OpenDialog("ChooseFileDlgKey", "Load Scene", ".json", config);
+                }
+
+                if (ImGuiFileDialog::Instance()->Display("ChooseFileDlgKey")) {
+                    if (ImGuiFileDialog::Instance()->IsOk()) {
+                        std::string file_path = ImGuiFileDialog::Instance()->GetFilePathName();
+                        tree.load(file_path);
+                        gpu_rc.set_tree(tree);
+                        gpu_rc.update_canvas(canvas, cuda_raycaster::GPURayCaster::Input {
+                                cam_operator.get_cam().get_inv_proj(),
+                                cam_operator.get_cam().get_inv_view(),
+                                cam_operator.get_cam().get_pos(),
+                                glm::vec2(INIT_SCREEN_SIZE_X, INIT_SCREEN_SIZE_Y),
+                                tree,
+                                show_csg,
+                        });
+                        txt_res->update(canvas);
+                    }
+                    ImGuiFileDialog::Instance()->Close();
+                }
+
                 ImGui::Checkbox("CPU", &cpu);
                 if (ImGui::Checkbox("CSG on", &show_csg)) {
                     if (cpu) {
@@ -113,7 +139,10 @@ int main(int, char**) {
                     }
                     txt_res->update(canvas);
                 }
+
                 ImGui::End();
+
+
             }
 
             ImGui::Render();

@@ -19,9 +19,14 @@ namespace cuda_raycaster {
         ~GPURayCaster();
         GPURayCaster(const csg::CSGTree& tree, int width, int height);
 
+        void set_tree(const csg::CSGTree& tree);
         void resize(int width, int height);
 
         void update_canvas(renderer::Image& canvas, const Input& input);
+
+    private:
+        void load_tree(const csg::CSGTree &tree);
+
 
     private:
         int m_width, m_height;
