@@ -17,7 +17,7 @@
 #include "csg_utils.cuh"
 
 #include "cpu_raycaster.hpp"
-
+#include "fps_counter.hpp"
 #include "cuda_raycaster.cuh"
 #include "vendor/FileBrowser/ImGuiFileDialog.h"
 
@@ -64,9 +64,11 @@ int main(int, char**) {
         std::chrono::steady_clock::time_point previous_time = current_time;
         std::chrono::duration<float> delta_time = std::chrono::duration_cast<std::chrono::duration<float>>(current_time - previous_time);
 
+
+        utils::FPSCounter fps_counter = utils::FPSCounter();
         bool show_csg = true;
         bool cpu = false;
-        bool open = false;
+        bool cam_moving = false;
 
         cuda_raycaster::GPURayCaster gpu_rc = cuda_raycaster::GPURayCaster(tree, INIT_SCREEN_SIZE_X, INIT_SCREEN_SIZE_Y);
 
@@ -89,13 +91,13 @@ int main(int, char**) {
             ImGui_ImplGlfw_NewFrame();
             ImGui::NewFrame();
             {
-
                 ImGui::Begin("Controls");
 
                 // Display floating text
                 ImGui::SetNextWindowPos(ImVec2(0, 0)); // Set position for the text
+                ImGui::SetNextWindowSize(ImVec2(100, 100));
                 ImGui::Begin("Floating Text", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings);
-                ImGui::Text("%.1f FPS", 1.f / delta_time.count());
+                ImGui::Text("FPS: %.1f", fps_counter.get_curr_fps());
                 ImGui::End();
 
                 if (ImGui::Button("Load Scene")) {
@@ -141,8 +143,6 @@ int main(int, char**) {
                 }
 
                 ImGui::End();
-
-
             }
 
             ImGui::Render();
@@ -150,6 +150,7 @@ int main(int, char**) {
             // Calculate delta time
             current_time = std::chrono::steady_clock::now();
             delta_time = std::chrono::duration_cast<std::chrono::duration<float>>(current_time - previous_time);
+            fps_counter.update(std::chrono::duration_cast<std::chrono::duration<double>>(current_time - previous_time).count());
             previous_time = current_time;
 
             if (cam_operator.update(window, delta_time.count())) {
