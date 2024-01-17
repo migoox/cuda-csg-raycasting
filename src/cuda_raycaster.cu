@@ -478,23 +478,23 @@ uint32_t k = blockIdx.x * blockDim.x + threadIdx.x;
         return;
     }
 
-//    // Assuming that there is max 512 leafs and max 512 centers
-//    __shared__ float sm_radiuses[512];
-//    __shared__ glm::vec3 sm_centers[512];
-//    __shared__ csg::Node sm_nodes[512];
+    // Assuming that there is max 512 leafs and max 512 centers
+    __shared__ float sm_radiuses[512];
+    __shared__ glm::vec3 sm_centers[512];
+    __shared__ csg::Node sm_nodes[512];
 
-//    // Assuming that there are exactly 1024 threads in one block
-//    if (threadIdx.x < prim_count) {
-//        sm_radiuses[threadIdx.x] = radiuses[threadIdx.x];
-//        sm_centers[threadIdx.x] = centers[threadIdx.x];
-//    }
+    // Assuming that there are exactly 1024 threads in one block
+    if (threadIdx.x < prim_count) {
+        sm_radiuses[threadIdx.x] = radiuses[threadIdx.x];
+        sm_centers[threadIdx.x] = centers[threadIdx.x];
+    }
 
-//    if (threadIdx.x < nodes_count) {
-//        sm_nodes[threadIdx.x] = nodes[threadIdx.x];
-//    }
+    if (threadIdx.x < nodes_count) {
+        sm_nodes[threadIdx.x] = nodes[threadIdx.x];
+    }
 
     // Sync the threads within the block
-   // __syncthreads();
+    __syncthreads();
 
     if (k >= count) {
         return;
@@ -504,12 +504,12 @@ uint32_t k = blockIdx.x * blockDim.x + threadIdx.x;
         canvas[k] = on_miss();
     }
 
-    auto result = csg_intersect_stack(nodes, prim_count, nodes_count, radiuses, centers, origins[k], dirs[k]);
+    auto result = csg_intersect_stack(sm_nodes, prim_count, nodes_count, sm_radiuses, sm_centers, origins[k], dirs[k]);
 
     if (result.leaf_id == -1) {
         canvas[k] = on_miss();
     } else {
-        canvas[k] = on_hit(origins[k] + dirs[k] * result.t, result.normal, colors[nodes[result.leaf_id].prim_id]);
+        canvas[k] = on_hit(origins[k] + dirs[k] * result.t, result.normal, colors[sm_nodes[result.leaf_id].prim_id]);
     }
 }
 
