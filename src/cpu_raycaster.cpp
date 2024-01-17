@@ -7,6 +7,20 @@ namespace cpu_raytracer {
     using namespace glm;
     using namespace csg;
 
+    void update_canvas(renderer::Image& canvas, app::CameraOperator& cam_operator, const csg::CSGTree& tree, bool show_csg) {
+        for (int y = 0; y < canvas.get_height(); y++) {
+            for (int x = 0; x < canvas.get_width(); x++) {
+                canvas.set_pixel(x, y, cpu_raytracer::per_pixel(x, y,
+                                                                glm::vec2(canvas.get_width(), canvas.get_height()),
+                                                                cam_operator.get_cam().get_pos(),
+                                                                cam_operator.get_cam().get_inv_proj(),
+                                                                cam_operator.get_cam().get_inv_view(),
+                                                                tree,
+                                                                show_csg));
+            }
+        }
+    }
+
     // Returns parametric function argument (t), returns -1.f in the case there was no hit
     float get_sphere_hit(vec3 center, float radius, vec3 ray_origin, vec3 ray_dir, float min) {
         vec3 co = ray_origin - center;

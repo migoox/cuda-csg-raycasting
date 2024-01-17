@@ -29,27 +29,14 @@ using namespace renderer;
 const int INIT_SCREEN_SIZE_X = 800;
 const int INIT_SCREEN_SIZE_Y = 600;
 
-void update_canvas(Image& canvas, app::CameraOperator& cam_operator, const csg::CSGTree& tree, bool show_csg) {
-    for (int y = 0; y < canvas.get_height(); y++) {
-        for (int x = 0; x < canvas.get_width(); x++) {
-            canvas.set_pixel(x, y, cpu_raytracer::per_pixel(x, y,
-                                                            glm::vec2(canvas.get_width(), canvas.get_height()),
-                                                            cam_operator.get_cam().get_pos(),
-                                                            cam_operator.get_cam().get_inv_proj(),
-                                                            cam_operator.get_cam().get_inv_view(),
-                                                            tree,
-                                                            show_csg));
-        }
-    }
-}
 
-// Main code
+
 int main(int, char**) {
     // Init GLFW
     Backend::init_glfw();
     {
         // Create a window
-        Window window(INIT_SCREEN_SIZE_X, INIT_SCREEN_SIZE_Y, "OpenGL 3D scenery");
+        Window window(INIT_SCREEN_SIZE_X, INIT_SCREEN_SIZE_Y, "Cuda csg ray casting");
 
         // Init GLEW and ImGui
         Backend::init_glew();
@@ -76,8 +63,7 @@ int main(int, char**) {
         std::chrono::duration<float> delta_time = std::chrono::duration_cast<std::chrono::duration<float>>(current_time - previous_time);
 
         bool show_csg = true;
-//        update_canvas(canvas, cam_operator, tree, show_csg);
-//        txt_res->update(canvas);
+        bool cpu = false;
 
         cuda_raycaster::GPURayCaster gpu_rc = cuda_raycaster::GPURayCaster(tree, INIT_SCREEN_SIZE_X, INIT_SCREEN_SIZE_Y);
 
@@ -110,19 +96,22 @@ int main(int, char**) {
                 ImGui::End();
 
                 ImGui::Button("Load Scene");
+                ImGui::Checkbox("CPU", &cpu);
                 if (ImGui::Checkbox("CSG on", &show_csg)) {
-//                    update_canvas(canvas, cam_operator, tree, show_csg);
-//                    txt_res->update(canvas);
-
-                gpu_rc.update_canvas(canvas, cuda_raycaster::GPURayCaster::Input {
-                        cam_operator.get_cam().get_inv_proj(),
-                        cam_operator.get_cam().get_inv_view(),
-                        cam_operator.get_cam().get_pos(),
-                        glm::vec2(INIT_SCREEN_SIZE_X, INIT_SCREEN_SIZE_Y),
-                        tree,
-                        show_csg,
-                });
-                txt_res->update(canvas);
+                    if (cpu) {
+                        cpu_raytracer::update_canvas(canvas, cam_operator, tree, show_csg);
+                        txt_res->update(canvas);
+                    } else {
+                        gpu_rc.update_canvas(canvas, cuda_raycaster::GPURayCaster::Input {
+                                cam_operator.get_cam().get_inv_proj(),
+                                cam_operator.get_cam().get_inv_view(),
+                                cam_operator.get_cam().get_pos(),
+                                glm::vec2(INIT_SCREEN_SIZE_X, INIT_SCREEN_SIZE_Y),
+                                tree,
+                                show_csg,
+                        });
+                    }
+                    txt_res->update(canvas);
                 }
                 ImGui::End();
             }
@@ -135,17 +124,19 @@ int main(int, char**) {
             previous_time = current_time;
 
             if (cam_operator.update(window, delta_time.count())) {
-//                update_canvas(canvas, cam_operator, tree, show_csg);
-//                txt_res->update(canvas);
-
-                gpu_rc.update_canvas(canvas, cuda_raycaster::GPURayCaster::Input {
-                        cam_operator.get_cam().get_inv_proj(),
-                        cam_operator.get_cam().get_inv_view(),
-                        cam_operator.get_cam().get_pos(),
-                        glm::vec2(INIT_SCREEN_SIZE_X, INIT_SCREEN_SIZE_Y),
-                        tree,
-                        show_csg,
-                });
+                if (cpu) {
+                    cpu_raytracer::update_canvas(canvas, cam_operator, tree, show_csg);
+                    txt_res->update(canvas);
+                } else {
+                    gpu_rc.update_canvas(canvas, cuda_raycaster::GPURayCaster::Input {
+                            cam_operator.get_cam().get_inv_proj(),
+                            cam_operator.get_cam().get_inv_view(),
+                            cam_operator.get_cam().get_pos(),
+                            glm::vec2(INIT_SCREEN_SIZE_X, INIT_SCREEN_SIZE_Y),
+                            tree,
+                            show_csg,
+                    });
+                }
                 txt_res->update(canvas);
             }
 

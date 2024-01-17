@@ -2,8 +2,12 @@
 #define CSG_RAY_TRACING_CUDA_RAYTRACER_CUH
 #include <cstdint>
 #include "csg_utils.cuh"
+#include "textures.hpp"
+#include "camera_operator.hpp"
 
 namespace cpu_raytracer {
+
+    void update_canvas(renderer::Image& canvas, app::CameraOperator& cam_operator, const csg::CSGTree& tree, bool show_csg);
 
     float get_sphere_hit(glm::vec3 center, float radius, glm::vec3 ray_origin, glm::vec3 ray_dir, float min = 0.f);
 
