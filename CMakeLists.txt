@@ -78,7 +78,7 @@ if (WIN32)
             TARGET ${PROJECT_NAME} POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E copy_directory
 				${CMAKE_CURRENT_BINARY_DIR}/res
-                ${CMAKE_CURRENT_BINARY_DIR}/$<IF:$<CONFIG:Debug>,Debug,Release>
+                ${CMAKE_CURRENT_BINARY_DIR}/$<IF:$<CONFIG:Debug>,Debug,Release>/res
         )
     endif()
 endif()
