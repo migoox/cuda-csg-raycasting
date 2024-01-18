@@ -31,8 +31,6 @@ namespace cuda_raycaster {
 
     private:
         int m_width, m_height;
-        glm::vec3 *m_dev_origins{};
-        glm::vec3 *m_dev_dirs{};
         uint32_t *m_dev_canvas{};
 
         float* m_dev_boundings_radiuses{};
@@ -47,8 +45,6 @@ namespace cuda_raycaster {
         csg::Node *m_dev_node_array{};
         uint32_t m_nodes_count;
     };
-
-
 }
 
 #endif //CUDA_CSG_RAYCASTING_CUDA_RAYCASTER_CUH

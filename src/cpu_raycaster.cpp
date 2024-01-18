@@ -10,7 +10,7 @@ namespace cpu_raytracer {
     static glm::vec3 sun_pos = glm::vec3(0.f, 1.f, 0.f);
     static glm::vec3 cam_pos = glm::vec3(0.f, 1.f, 0.f);
 
-    void update_canvas(glm::vec3 sun, renderer::Image& canvas, app::CameraOperator& cam_operator, const csg::CSGTree& tree, bool show_csg) {
+    void update_canvas(const glm::vec3& sun, renderer::Image& canvas, app::CameraOperator& cam_operator, const csg::CSGTree& tree, bool show_csg) {
         for (int y = 0; y < canvas.get_height(); y++) {
             for (int x = 0; x < canvas.get_width(); x++) {
                 canvas.set_pixel(x, y, cpu_raytracer::per_pixel(x, y,
@@ -28,7 +28,7 @@ namespace cpu_raytracer {
     }
 
     // Returns parametric function argument (t), returns -1.f in the case there was no hit
-    float get_sphere_hit(vec3 center, float radius, vec3 ray_origin, vec3 ray_dir, float min) {
+    float get_sphere_hit(const vec3& center, float radius, const vec3& ray_origin, const vec3& ray_dir, float min) {
         vec3 co = ray_origin - center;
 
         // Quadratic equation
@@ -58,7 +58,7 @@ namespace cpu_raytracer {
         return -1.f;
     }
 
-    uint32_t on_hit(vec3 hit_point, vec3 normal, vec3 color) {
+    uint32_t on_hit(const vec3& hit_point, const vec3& normal, const vec3& color) {
         vec3 light_pos = vec3(0.f, 1.f, 0.f);
 
         // normal = 0.5f * (normal + 1.f);
@@ -82,7 +82,7 @@ namespace cpu_raytracer {
         return renderer::get_color_rgb(60, 60, 60);
     }
 
-    csg::PointState csg_point_classify(float t, glm::vec3 normal, glm::vec3 ray_dir) {
+    csg::PointState csg_point_classify(float t, const glm::vec3& normal, const glm::vec3& ray_dir) {
         if (t == 0.f) {
             return PointState::Miss;
         }
@@ -187,7 +187,7 @@ namespace cpu_raytracer {
         return on_miss();
     }
 
-    uint32_t per_pixel(int x, int y, vec2 canvas, vec3 eye, mat4 inv_proj, mat4 inv_view, const csg::CSGTree& tree, bool csg) {
+    uint32_t per_pixel(int x, int y, const vec2& canvas, const vec3& eye, const mat4& inv_proj, const mat4& inv_view, const csg::CSGTree& tree, bool csg) {
         vec2 viewport_coords = { static_cast<float>(x) / canvas.x, (static_cast<float>(y)) / canvas.y };
         viewport_coords = viewport_coords * 2.0f - 1.0f;
 

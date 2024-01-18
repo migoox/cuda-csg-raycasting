@@ -22,7 +22,7 @@ __device__ uint32_t get_color_rgb(uint8_t r, uint8_t g, uint8_t b) {
 }
 
 // Returns parametric function argument (t), returns -1.f in the case there was no hit
-__device__ float get_sphere_hit(glm::vec3 center, float radius, glm::vec3 ray_origin, glm::vec3 ray_dir, float min) {
+__device__ float get_sphere_hit(const glm::vec3& center, float radius, const glm::vec3& ray_origin, const glm::vec3& ray_dir, float min) {
     glm::vec3 co = ray_origin - center;
 
     // Quadratic equation
@@ -52,7 +52,7 @@ __device__ float get_sphere_hit(glm::vec3 center, float radius, glm::vec3 ray_or
     return -1.f;
 }
 
-__device__ uint32_t on_hit(glm::vec3 hit_point, glm::vec3 normal, glm::vec3 color) {
+__device__ uint32_t on_hit(const glm::vec3& hit_point, const glm::vec3& normal, const glm::vec3& color) {
     // normal = 0.5f * (normal + 1.f);
     // return get_color_rgb_norm(normal.r, normal.g, normal.b);
 
@@ -81,14 +81,7 @@ void check_cuda_error(const cudaError_t &cuda_status, const char *msg) {
         std::terminate();
     }
 }
-__global__ void init(uint32_t *canvas, glm::vec3 *origins, glm::vec3 *dirs, int count) {
-    uint32_t k = blockIdx.x * blockDim.x + threadIdx.x;
-    if (k < count) {
-        canvas[k] = 0x000000FF;
-        origins[k] = glm::vec3(0.f);
-        dirs[k] = glm::vec3(0.f);
-    }
-}
+
 
 void cuda_raycaster::GPURayCaster::load_tree(const csg::CSGTree &tree) {
     cudaError_t cuda_status;
@@ -142,60 +135,20 @@ cuda_raycaster::GPURayCaster::GPURayCaster(const csg::CSGTree& tree, int width, 
     // Allocate memory on the device using cudaMalloc
     cuda_status = cudaMalloc((void**)&m_dev_canvas, width * height * sizeof(uint32_t));
     check_cuda_error(cuda_status, "[CUDA]: cudaMalloc failed: ");
-    cuda_status = cudaMalloc((void**)&m_dev_origins, width * height * sizeof(glm::vec3));
-    check_cuda_error(cuda_status, "[CUDA]: cudaMalloc failed: ");
-    cuda_status = cudaMalloc((void**)&m_dev_dirs, width * height * sizeof(glm::vec3));
-    check_cuda_error(cuda_status, "[CUDA]: cudaMalloc failed: ");
 
-    size_t threads_per_block = 1024;
-    size_t blocks_num = m_width * m_height / threads_per_block + 1;
-    init<<<blocks_num, threads_per_block>>>(
-            m_dev_canvas,
-            m_dev_origins,
-            m_dev_dirs,
-            width * height
-    );
     cudaDeviceSynchronize();
     load_tree(tree);
 }
 
 
 cuda_raycaster::GPURayCaster::~GPURayCaster() {
-    cudaFree(m_dev_origins);
-    cudaFree(m_dev_dirs);
     cudaFree(m_dev_canvas);
-
     cudaFree(m_dev_radiuses);
     cudaFree(m_dev_centers);
     cudaFree(m_dev_colors);
     cudaFree(m_dev_node_array);
     cudaFree(m_dev_boundings_radiuses);
     cudaFree(m_dev_boundings_centers);
-}
-
-__global__ void find_dirs(
-        glm::vec2 canvas_size,
-        glm::vec3 eye,
-        glm::mat4 inv_proj,
-        glm::mat4 inv_view,
-        glm::vec3* origins,
-        glm::vec3* dirs,
-        int width,
-        int height
-) {
-    uint32_t k = blockIdx.x * blockDim.x + threadIdx.x;
-    int count = width * height;
-    if (k < count) {
-        uint32_t x = k % width;
-        uint32_t y = k / width;
-        glm::vec2 viewport_coords = { static_cast<float>(x) / canvas_size.x, (static_cast<float>(y)) / canvas_size.y };
-        viewport_coords = viewport_coords * 2.0f - 1.0f;
-
-        // pixel's position in the world space
-        glm::vec4 target = inv_proj * glm::vec4(viewport_coords.x, viewport_coords.y, -1.f, 1.f);
-        dirs[k] = glm::vec3(inv_view * glm::vec4(normalize(glm::vec3(target) / target.w), 0.f)); // world space
-        origins[k] = eye;
-    }
 }
 
 __device__ csg::PointState csg_point_classify(const csg::IntersectionResult& res, glm::vec3 ray_dir) {
@@ -213,72 +166,6 @@ __device__ csg::PointState csg_point_classify(const csg::IntersectionResult& res
 
     return csg::PointState::Miss;
 }
-
-__device__ csg::IntersectionResult csg_intersect_rec(
-        csg::Node *nodes,
-        int prim_count,
-        int nodes_count,
-        float *radiuses,
-        glm::vec3 *centers,
-        glm::vec3 origin,
-        glm::vec3 dir,
-        csg::Node node,
-        float min
-) {
-    // Stop condition
-    if (node.type == csg::Node::Type::Sphere) {
-        float t = get_sphere_hit(centers[node.context_id], radiuses[node.context_id], origin, dir, min);
-        return csg::IntersectionResult {
-                t,
-                t == -1.f ? glm::vec3(0.f) : normalize(origin + t * dir - centers[node.context_id]),
-                node.id
-        };
-    }
-
-    float min_l = min;
-    float min_r = min;
-
-    // Recursive call
-    csg::IntersectionResult res_l = csg_intersect_rec(nodes, prim_count, nodes_count, radiuses, centers,  origin, dir, nodes[node.get_left_id()], min_l);
-    csg::IntersectionResult res_r = csg_intersect_rec(nodes, prim_count, nodes_count, radiuses, centers,  origin, dir, nodes[node.get_right_id()], min_r);
-
-    csg::PointState state_l = csg_point_classify(res_l, dir);
-    csg::PointState state_r = csg_point_classify(res_r, dir);
-    while (true) {
-        csg::CSGActions actions = csg::CSGActions(state_l, state_r, node);
-        if (actions.has_action(csg::CSGActions::Miss)) {
-            return csg::IntersectionResult { -1.f, glm::vec3(0.f), -1 }; // Miss
-        }
-
-        if (actions.has_action(csg::CSGActions::RetLeft) ||
-            (actions.has_action(csg::CSGActions::RetLeftIfCloser) && res_l.t <= res_r.t)) {
-            return res_l;
-        }
-
-        if (actions.has_action(csg::CSGActions::RetRight) ||
-            (actions.has_action(csg::CSGActions::RetRightIfCloser) && res_r.t <= res_l.t)) {
-            if (actions.has_action(csg::CSGActions::FlipRight)) {
-                return csg::IntersectionResult { res_r.t, -res_r.normal, res_r.leaf_id };
-            }
-            return res_r;
-        }
-
-        if (actions.has_action(csg::CSGActions::LoopLeft) ||
-            (actions.has_action(csg::CSGActions::LoopLeftIfCloser) && res_l.t <= res_r.t)) {
-            min_l = res_l.t;
-            res_l = csg_intersect_rec(nodes, prim_count, nodes_count, radiuses, centers, origin, dir, nodes[node.get_left_id()], min_l);
-            state_l = csg_point_classify(res_l, dir);
-        } else if (actions.has_action(csg::CSGActions::LoopRight) ||
-                   (actions.has_action(csg::CSGActions::LoopRightIfCloser) && res_r.t <= res_l.t)) {
-            min_r = res_r.t;
-            res_r = csg_intersect_rec(nodes, prim_count, nodes_count, radiuses, centers,  origin, dir, nodes[node.get_right_id()], min_r);
-            state_r = csg_point_classify(res_r, dir);
-        } else {
-            return csg::IntersectionResult { -1.f, glm::vec3(0.f), -1 }; // Miss
-        }
-    }
-}
-
 
 __device__ csg::IntersectionResult csg_intersect_stack(
         csg::Node *nodes,
@@ -355,7 +242,7 @@ __device__ csg::IntersectionResult csg_intersect_stack(
                             t < 0.f ? -1 : curr_node.get_left_id()
                     };
                 } else {
-                    // Check sphere bounding
+                    // Check sphere bounding (not working yet)
 //                    float t = get_sphere_hit(
 //                            boundings_centers[nodes[curr_node.get_left_id()].context_id],
 //                            boundings_radiuses[nodes[curr_node.get_left_id()].context_id],
@@ -389,7 +276,7 @@ __device__ csg::IntersectionResult csg_intersect_stack(
                             t < 0.f ? -1 : curr_node.get_right_id()
                     };
                 } else {
-                    // Check sphere bounding
+                    // Check sphere bounding (not working yet)
 //                    float t = get_sphere_hit(
 //                            boundings_centers[nodes[curr_node.get_right_id()].context_id],
 //                            boundings_radiuses[nodes[curr_node.get_right_id()].context_id],
@@ -546,8 +433,10 @@ __global__ void csg_trace_ray_stack(
         uint32_t *canvas,
         int width,
         int height,
-        glm::vec3 *origins,
-        glm::vec3 *dirs
+        glm::vec3 eye,
+        glm::vec2 canvas_size,
+        glm::mat4 inv_proj,
+        glm::mat4 inv_view
 ) {
 uint32_t k = blockIdx.x * blockDim.x + threadIdx.x;
     int count = width * height;
@@ -555,59 +444,15 @@ uint32_t k = blockIdx.x * blockDim.x + threadIdx.x;
         return;
     }
 
-    // Assuming that there is max 512 leafs and max 512 centers
-    __shared__ float sm_radiuses[512];
-    __shared__ glm::vec3 sm_centers[512];
-    __shared__ csg::Node sm_nodes[512];
+    uint32_t x = k % width;
+    uint32_t y = k / width;
+    glm::vec2 viewport_coords = { static_cast<float>(x) / canvas_size.x, (static_cast<float>(y)) / canvas_size.y };
+    viewport_coords = viewport_coords * 2.0f - 1.0f;
 
-    // Assuming that there are exactly 1024 threads in one block
-    if (threadIdx.x < prim_count) {
-        sm_radiuses[threadIdx.x] = radiuses[threadIdx.x];
-        sm_centers[threadIdx.x] = centers[threadIdx.x];
-    }
-
-    if (threadIdx.x < nodes_count) {
-        sm_nodes[threadIdx.x] = nodes[threadIdx.x];
-    }
-
-    // Sync the threads within the block
-    __syncthreads();
-
-    if (k >= count) {
-        return;
-    }
-
-    if (nodes_count <= 1) {
-        canvas[k] = on_miss();
-    }
-
-    auto result = csg_intersect_stack(sm_nodes, prim_count, nodes_count, sm_radiuses, sm_centers, boundings_radiuses, boundings_centers, origins[k], dirs[k]);
-
-    if (result.leaf_id == -1) {
-        canvas[k] = on_miss();
-    } else {
-        canvas[k] = on_hit(origins[k] + dirs[k] * result.t, result.normal, colors[sm_nodes[result.leaf_id].context_id]);
-    }
-}
-
-__global__ void csg_trace_ray_rec(
-        csg::Node *nodes,
-        float *radiuses,
-        glm::vec3 *centers,
-        glm::vec3 *colors,
-        int prim_count,
-        int nodes_count,
-        uint32_t *canvas,
-        int width,
-        int height,
-        glm::vec3 *origins,
-        glm::vec3 *dirs
-) {
-    uint32_t k = blockIdx.x * blockDim.x + threadIdx.x;
-    int count = width * height;
-    if (k >= count) {
-        return;
-    }
+    // pixel's position in the world space
+    glm::vec4 target = inv_proj * glm::vec4(viewport_coords.x, viewport_coords.y, -1.f, 1.f);
+    glm::vec3 dir = glm::vec3(inv_view * glm::vec4(normalize(glm::vec3(target) / target.w), 0.f)); // world space
+    glm::vec3 origin = eye;
 
     // Assuming that there is max 512 leafs and max 512 centers
     __shared__ float sm_radiuses[512];
@@ -635,12 +480,12 @@ __global__ void csg_trace_ray_rec(
         canvas[k] = on_miss();
     }
 
-    auto result = csg_intersect_rec(sm_nodes, prim_count, nodes_count, sm_radiuses, sm_centers, origins[k], dirs[k], nodes[1], 0.f);
+    auto result = csg_intersect_stack(sm_nodes, prim_count, nodes_count, sm_radiuses, sm_centers, boundings_radiuses, boundings_centers, origin, dir);
 
     if (result.leaf_id == -1) {
         canvas[k] = on_miss();
     } else {
-        canvas[k] = on_hit(origins[k] + dirs[k] * result.t, result.normal, colors[sm_nodes[result.leaf_id].context_id]);
+        canvas[k] = on_hit(origin + dir * result.t, result.normal, colors[sm_nodes[result.leaf_id].context_id]);
     }
 }
 
@@ -649,21 +494,33 @@ __global__ void trace_ray(
         glm::vec3 *centers,
         glm::vec3 *colors,
         uint32_t spheres_count,
-        glm::vec3 *origins,
-        glm::vec3 *dirs,
         uint32_t *canvas,
         int width,
-        int height
+        int height,
+        glm::vec3 eye,
+        glm::vec2 canvas_size,
+        glm::mat4 inv_proj,
+        glm::mat4 inv_view
 ) {
     int k = blockIdx.x * blockDim.x + threadIdx.x;
     if (k >= width * height) {
         return;
     }
 
+    uint32_t x = k % width;
+    uint32_t y = k / width;
+    glm::vec2 viewport_coords = { static_cast<float>(x) / canvas_size.x, (static_cast<float>(y)) / canvas_size.y };
+    viewport_coords = viewport_coords * 2.0f - 1.0f;
+
+    // pixel's position in the world space
+    glm::vec4 target = inv_proj * glm::vec4(viewport_coords.x, viewport_coords.y, -1.f, 1.f);
+    glm::vec3 dir = glm::vec3(inv_view * glm::vec4(normalize(glm::vec3(target) / target.w), 0.f)); // world space
+    glm::vec3 origin = eye;
+
     float t_min = FLT_MAX;
     int closest_sphere = -1;
     for (int i = 0; i < spheres_count; ++i) {
-        float t = get_sphere_hit(centers[i], radiuses[i], origins[k], dirs[k], 0.f);
+        float t = get_sphere_hit(centers[i], radiuses[i], origin, dir, 0.f);
 
         if (t > 0.f && t < t_min) {
             t_min = t;
@@ -672,7 +529,7 @@ __global__ void trace_ray(
     }
 
     if (closest_sphere != -1) {
-        glm::vec3 closest_hit = origins[k] + dirs[k] * t_min;
+        glm::vec3 closest_hit = origin + dir * t_min;
         canvas[k] = on_hit(closest_hit, normalize(closest_hit - centers[closest_sphere]),
                            colors[closest_sphere]);
     } else {
@@ -689,20 +546,6 @@ void cuda_raycaster::GPURayCaster::update_canvas(renderer::Image &canvas,
     size_t threads_per_block = 1024;
     size_t blocks_num = m_width * m_height / threads_per_block + 1;
 
-    // First kernel: find rays and origins
-    find_dirs<<<blocks_num, threads_per_block>>>(
-            input.canvas,
-            input.eye,
-            input.inv_proj,
-            input.inv_view,
-            m_dev_origins,
-            m_dev_dirs,
-            m_width,
-            m_height
-    );
-    cudaDeviceSynchronize();
-
-    // Second kernel: ray casting
     if (input.show_csg) {
         csg_trace_ray_stack<<<blocks_num, threads_per_block>>>(
                 m_dev_node_array,
@@ -716,8 +559,10 @@ void cuda_raycaster::GPURayCaster::update_canvas(renderer::Image &canvas,
                 m_dev_canvas,
                 m_width,
                 m_height,
-                m_dev_origins,
-                m_dev_dirs
+                input.eye,
+                input.canvas,
+                input.inv_proj,
+                input.inv_view
         );
     } else {
         trace_ray<<<blocks_num, threads_per_block>>>(
@@ -725,15 +570,18 @@ void cuda_raycaster::GPURayCaster::update_canvas(renderer::Image &canvas,
                 m_dev_centers,
                 m_dev_colors,
                 m_spheres_count,
-                m_dev_origins,
-                m_dev_dirs,
                 m_dev_canvas,
                 m_width,
-                m_height
+                m_height,
+                input.eye,
+                input.canvas,
+                input.inv_proj,
+                input.inv_view
         );
     }
     cudaDeviceSynchronize();
 
+    // Copy the canvas data to the cpu
     cudaError_t cuda_status;
     cuda_status = cudaMemcpy((void*)canvas.raw(), m_dev_canvas, m_width * m_height * sizeof(uint32_t), cudaMemcpyDeviceToHost);
     check_cuda_error(cuda_status, "[CUDA]: cudaMemcpy failed: ");
@@ -746,15 +594,9 @@ void cuda_raycaster::GPURayCaster::resize(int width, int height) {
     m_width = width;
     m_height = height;
 
-    cudaFree(m_dev_dirs);
-    cudaFree(m_dev_origins);
     cudaFree(m_dev_canvas);
 
     cudaError_t cuda_status;
-    cuda_status = cudaMalloc((void**)&m_dev_origins, width * height * sizeof(glm::vec3));
-    check_cuda_error(cuda_status, "[CUDA]: cudaMalloc failed: ");
-    cuda_status = cudaMalloc((void**)&m_dev_dirs, width * height * sizeof(glm::vec3));
-    check_cuda_error(cuda_status, "[CUDA]: cudaMalloc failed: ");
     cuda_status = cudaMalloc((void**)&m_dev_canvas, width * height * sizeof(uint32_t));
     check_cuda_error(cuda_status, "[CUDA]: cudaMalloc failed: ");
 }
