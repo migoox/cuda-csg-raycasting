@@ -56,3 +56,25 @@ set_target_properties(cuda-csg-raycasting PROPERTIES
 # Include CUDA directories
 include_directories(${CUDA_INCLUDE_DIRS})
 
+# WINDOWS POSTBUILD -- copy the .dll files into Relase/Debug folder
+if (WIN32)
+    if ($ENV{CLION_IDE})
+         add_custom_command(
+            TARGET ${PROJECT_NAME} POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy
+                ${CMAKE_CURRENT_BINARY_DIR}/../dependencies/bin/glfw3.dll
+                ${CMAKE_CURRENT_BINARY_DIR}/../dependencies/bin/glew32.dll
+                ${CMAKE_CURRENT_BINARY_DIR}
+        )
+    else()
+        add_custom_command(
+            TARGET ${PROJECT_NAME} POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy
+                ${CMAKE_CURRENT_BINARY_DIR}/dependencies/bin/glfw3.dll
+                ${CMAKE_CURRENT_BINARY_DIR}/dependencies/bin/glew32.dll
+                ${CMAKE_CURRENT_BINARY_DIR}/$<IF:$<CONFIG:Debug>,Debug,Release>
+        )
+    endif()
+endif()
+
+
