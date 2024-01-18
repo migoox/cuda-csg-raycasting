@@ -7,6 +7,7 @@
 #include <GL/glew.h>
 #include <optional>
 #include <filesystem>
+#include <vector>
 
 namespace renderer {
     class Image {
