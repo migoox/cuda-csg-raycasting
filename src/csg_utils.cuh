@@ -34,6 +34,7 @@ namespace csg {
     class CSGTree {
     public:
         explicit CSGTree(const std::string& path);
+        CSGTree();
 
         Node get_node(int id) const;
         size_t get_nodes_count() const { return m_node_array.size(); }
