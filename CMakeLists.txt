@@ -74,6 +74,12 @@ if (WIN32)
                 ${CMAKE_CURRENT_BINARY_DIR}/dependencies/bin/glew32.dll
                 ${CMAKE_CURRENT_BINARY_DIR}/$<IF:$<CONFIG:Debug>,Debug,Release>
         )
+        add_custom_command(
+            TARGET ${PROJECT_NAME} POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_directory
+				${CMAKE_CURRENT_BINARY_DIR}/res
+                ${CMAKE_CURRENT_BINARY_DIR}/$<IF:$<CONFIG:Debug>,Debug,Release>
+        )
     endif()
 endif()
 
