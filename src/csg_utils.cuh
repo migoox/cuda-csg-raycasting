@@ -22,7 +22,7 @@ namespace csg {
         // context_id refers to center, radius and color
         Type type;   // node type ( if None => the node is invalid)
 
-        __host__ __device__ Node() = default;
+        Node() = default;
         __host__ __device__ Node(int id, int context_id, Type type);
         __host__ __device__ int get_parent_id() const;
         __host__ __device__ int get_left_id() const;
