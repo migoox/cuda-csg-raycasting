@@ -104,8 +104,8 @@ namespace cpu_raytracer {
             float t = get_sphere_hit(tree.sphere_center(node.context_id), tree.sphere_radius(node.context_id), origin, dir, min);
             return IntersectionResult {
                     t,
-                    t == -1.f ? vec3(0.f) : normalize(origin + t * dir - tree.sphere_center(node.context_id)),
-                    node.id
+                    t < 0.f ? vec3(0.f) : normalize(origin + t * dir - tree.sphere_center(node.context_id)),
+                    t < 0.f ? -1 : node.id
             };
         }
 
