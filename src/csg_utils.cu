@@ -135,7 +135,8 @@ void csg::CSGTree::load(const std::string& path) {
     m_node_array[0] = Node(0, -1, Node::Guard);
 
     if (!check_correctness(m_node_array[1])) {
-        std::cerr << "[Loader]: The tree is incorrect -- every leaf must be a primitive and every operation must have exactly two children.\n" << std::endl;
+        std::cerr << "[Tree Loader]: The tree is incorrect -- every leaf must be a primitive and every operation must have exactly two children.\n" << std::endl;
+        this->load_init();
         return;
     }
 
@@ -160,12 +161,23 @@ void csg::CSGTree::load(const std::string& path) {
     m_sb_centers.shrink_to_fit();
 }
 
-csg::CSGTree::CSGTree() {
+void csg::CSGTree::load_init() {
+    m_node_array.clear();
+    m_sphere_colors.clear();
+    m_sphere_radiuses.clear();
+    m_sphere_centers.clear();
+    m_sb_radiuses.clear();
+    m_sb_centers.clear();
+
     m_node_array.emplace_back(0, -1, Node::Guard);
     m_node_array.emplace_back(1, 0, Node::Sphere);
     m_sphere_centers.emplace_back(0.f, 0.f, -5.f);
     m_sphere_radiuses.push_back(1.f);
     m_sphere_colors.emplace_back(1.f, 0.f, 0.f);
+}
+
+csg::CSGTree::CSGTree() {
+    this->load_init();
 }
 
 csg::CSGTree::CSGTree(const std::string &path) {
@@ -184,7 +196,6 @@ csg::Node::Type csg::CSGTree::str_to_type(const std::string &str) {
     }
     return Node::None;
 }
-
 
 
 __host__ __device__ csg::CSGActions::CSGActions(csg::PointState state_l, csg::PointState state_r, const csg::Node &node) {

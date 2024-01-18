@@ -56,6 +56,7 @@ namespace csg {
         void load(const std::string& path);
 
     private:
+        void load_init();
         static Node::Type str_to_type(const std::string& str);
 
         bool check_correctness(csg::Node root);
