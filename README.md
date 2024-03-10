@@ -13,8 +13,7 @@ Constructive Solid Geometry Scenes](https://ceur-ws.org/Vol-1576/090.pdf) by D.Y
 
 |  |  |
 |---|---|
-|![image](https://github.com/migoox/cuda-csg-raycasting/assets/56317134/0f00c2c0-3978-4ff4-b8e8-bfb795598afa)|
-![image](https://github.com/migoox/cuda-csg-raycasting/assets/56317134/24866f77-bda1-4bce-901d-cdee3f160966)|
+|![image](https://github.com/migoox/cuda-csg-raycasting/assets/56317134/0f00c2c0-3978-4ff4-b8e8-bfb795598afa)|![image](https://github.com/migoox/cuda-csg-raycasting/assets/56317134/24866f77-bda1-4bce-901d-cdee3f160966)|
 
 
 ## Usage
