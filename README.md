@@ -32,7 +32,7 @@ Constructive Solid Geometry Scenes](https://www.semanticscholar.org/paper/Spatia
 - To control the direction of light incidence, use the Polar/Azim angle parameters accessible in the Controls window,
 - To enter camera mode, hold down the right mouse button,
 - In camera mode, you can adjust its direction using the mouse,
-- In camera mode, you can change its position in space using the W, S, A, D, Q, and E keys,
+- In camera mode, you can change its position in space using the `W`, `S`, `A`, `D`, `Q`, and `E` keys,
 - To load sample trees, use the Load Scene button,
 - Sample .json files are located in the res folder.
 
