@@ -1,27 +1,40 @@
 # CSG raycasting with CUDA
+This application allows displaying real-time CSG Scene loaded from `.json` file. The user can rotate/move the camera to see the scene from different angles and change the direction of a directional light.
+
 [CSG](https://en.wikipedia.org/wiki/Constructive_solid_geometry) (Constructive Solid Geometry) allows a modeler to create 
 a complex surface or object by using Boolean operators (union, intersection and difference) to combine simpler objects (wikipedia).
 
+The CSG raycasting algorithm has been implemented using CUDA and is based on the [Spatially Efficient Tree Layout for GPU Ray-tracing of
+Constructive Solid Geometry Scenes](https://www.semanticscholar.org/paper/Spatially-Efficient-Tree-Layout-for-GPU-Ray-tracing-Ulyanov-Bogolepov/8e29e7a9ee23ae587a4ee6e6ecd25cc32266499a) paper by D.Y. Ulyanov, D.K. Bogolepov and V.E. Turlapov.
+
 | CSG off | CSG on |
 |---|---|
-|![image](https://github.com/migoox/cuda-csg-raycasting/assets/56317134/0f00c2c0-3978-4ff4-b8e8-bfb795598afa)|![image](https://github.com/migoox/cuda-csg-raycasting/assets/56317134/24866f77-bda1-4bce-901d-cdee3f160966)|
-
-This application allows displaying real-time CSG Scene loaded from `.json` file ((nlohmann/json)[https://github.com/nlohmann/json]). 
-The json file format is a little bit akward for now, since it is array representation of a binary tree. 
-
-![image](https://github.com/migoox/cuda-csg-raycasting/assets/56317134/6346f133-ab86-4522-bb9d-640ebd189c9d)
+|<img src="media/csg_off.png" width="300">|<img src="media/csg_on.png" width="300">|
 
 
-The CSG raycasting algorithm implemented using CUDA was based on the [Spatially Efficient Tree Layout for GPU Ray-tracing of
-Constructive Solid Geometry Scenes](https://ceur-ws.org/Vol-1576/090.pdf) by D.Y. Ulyanov, D.K. Bogolepov and V.E. Turlapov.
+| The application |
+|---|
+|<img src="media/app.png" width="500">|
 
 
+## Limitations
+1. The json file format is a little bit akward for now, since it is array representation of a binary tree.
+2. There is only sphere support implemented.
+3. There is no editor.
 
+## 3rd party libraries
+- [imgui](https://github.com/ocornut/imgui)
+- [nlohmann/json](https://github.com/nlohmann/json)
+- [dirent](https://github.com/tronkko/dirent/tree/master)
+- [ImGuiFileDialog](https://github.com/aiekick/ImGuiFileDialog)
 
 ## Usage
-
-
-
+- To control the direction of light incidence, use the Polar/Azim angle parameters accessible in the Controls window,
+- To enter camera mode, hold down the right mouse button,
+- In camera mode, you can adjust its direction using the mouse,
+- In camera mode, you can change its position in space using the W, S, A, D, Q, and E keys,
+- To load sample trees, use the Load Scene button,
+- Sample .json files are located in the res folder.
 
 ## Requirements
 You need [NVIDIA CUDA GPU](https://developer.nvidia.com/cuda-gpus) to run the application. This application has been tested on the following GPU's: 
